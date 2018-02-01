@@ -19,3 +19,5 @@ CREATE TABLE `message_date` (
   `update_date` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+INSERT INTO comment_list (list) VALUES ('')

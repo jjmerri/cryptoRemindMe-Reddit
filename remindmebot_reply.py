@@ -5,13 +5,11 @@
 # =============================================================================
 
 import praw
-import OAuth2Util
-import re
 import MySQLdb
 import ConfigParser
 import time
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from requests.exceptions import HTTPError, ConnectionError, Timeout
 from praw.exceptions import APIException, ClientException, PRAWException
 from socket import timeout
@@ -73,7 +71,7 @@ class Reply(object):
             "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
             "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
             "|[^(Feedback)](http://np.reddit.com/message/compose/?to=boyAndHisBlob&subject=xrpRemindMe Feedback)"
-            "|[^(Code)](https://github.com/jjmerri/xrpRemindMe)"
+            "|[^(Code)](https://github.com/jjmerri/xrpRemindMe-Reddit)"
             "\n|-|-|-|-|-|-|"
             )
         self._high = 0.00

@@ -5,7 +5,6 @@
 # =============================================================================
 import traceback
 import praw
-import OAuth2Util
 import re
 import MySQLdb
 import ConfigParser
@@ -13,12 +12,8 @@ import ast
 import time
 import urllib
 import requests
-import parsedatetime.parsedatetime as pdt
-from datetime import datetime, timedelta
-from requests.exceptions import HTTPError, ConnectionError, Timeout
-from praw.errors import ExceptionList, APIException, InvalidCaptcha, InvalidUser, RateLimitExceeded, Forbidden
-from socket import timeout
-from pytz import timezone
+from datetime import datetime
+from praw.exceptions import APIException, PRAWException
 from threading import Thread
 
 # =============================================================================
@@ -29,10 +24,17 @@ from threading import Thread
 config = ConfigParser.ConfigParser()
 config.read("remindmebot.cfg")
 
+bot_username = config.get("Reddit", "username")
+bot_password = config.get("Reddit", "password")
+client_id = config.get("Reddit", "client_id")
+client_secret = config.get("Reddit", "client_secret")
+
 #Reddit info
-reddit = praw.Reddit(user_agent= "RemindMes")
-o = OAuth2Util.OAuth2Util(reddit, print_log = True)
-o.refresh(force=True)
+reddit = praw.Reddit(client_id=client_id,
+                     client_secret=client_secret,
+                     password=bot_password,
+                     user_agent='xrpRemindMe by /u/boyAndHisBlob',
+                     username=bot_username)
 
 DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
@@ -72,12 +74,12 @@ class Search(object):
     endMessage = (
         "\n\n_____\n\n"
         "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
-        "|[^(Custom)](http://np.reddit.com/message/compose/?to=RemindMeBot&subject=Reminder&message="
+        "|[^(Custom)](http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=Reminder&message="
             "[LINK INSIDE SQUARE BRACKETS else default to FAQs]%0A%0A"
-            "NOTE: Don't forget to add the time options after the command.%0A%0ARemindMe!)"
-        "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=RemindMeBot&subject=List Of Reminders&message=MyReminders!)"
-        "|[^(Feedback)](http://np.reddit.com/message/compose/?to=RemindMeBotWrangler&subject=Feedback)"
-        "|[^(Code)](https://github.com/SIlver--/remindmebot-reddit)"
+            "NOTE: Don't forget to add the time options after the command.%0A%0AxrpRemindMe!)"
+        "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
+        "|[^(Feedback)](http://np.reddit.com/message/compose/?to=xrpRemindMeBotWrangler&subject=Feedback)"
+        "|[^(Code)](https://github.com/jjmerri/xrpRemindMe-Reddit)"
         "|[^(Browser Extensions)](https://np.reddit.com/r/RemindMeBot/comments/4kldad/remindmebot_extensions/)"
         "\n|-|-|-|-|-|-|"
         )
@@ -86,10 +88,10 @@ class Search(object):
         self._addToDB = Connect()
         self.comment = comment # Reddit comment Object
         self._messageInput = '"Hello, I\'m here to remind you to see the parent comment!"'
-        self._storeTime = None
+        self._storePrice = None
         self._replyMessage = ""
         self._replyDate = None
-        self._originDate = datetime.fromtimestamp(comment.created_utc)
+        self._originPrice = datetime.fromtimestamp(comment.created_utc)
         self._privateMessage = False
         
     def run(self, privateMessage=False):
@@ -122,8 +124,8 @@ class Search(object):
                 # Defaults when the user doesn't provide a link
                 self.comment.permalink = "http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/"
 
-        # remove RemindMe! or !RemindMe (case insenstive)
-        match = re.search(r'(?i)(!*)RemindMe(!*)', self.comment.body)
+        # remove xrpRemindMe! or !xrpRemindMe (case insenstive)
+        match = re.search(r'(?i)(!*)xrpRemindMe(!*)', self.comment.body)
         # and everything before
         tempString = self.comment.body[match.start():]
 
@@ -139,33 +141,19 @@ class Search(object):
             self._messageInput = messageInputTemp.group()
         # Fix issue with dashes for parsedatetime lib
         tempString = tempString.replace('-', "/")
-        # Remove RemindMe!
-        self._storeTime = re.sub('(["].{0,9000}["])', '', tempString)[9:]
+        # Remove xrpRemindMe!
+        self._storePrice = re.sub('(["].{0,9000}["])', '', tempString)[12:]
     
     def save_to_db(self):
         """
-        Saves the permalink comment, the time, and the message to the DB
+        Saves the id of the comment, the current price, and the message to the DB
         """
-
-        cal = pdt.Calendar()
-        try:
-            holdTime = cal.parse(self._storeTime, datetime.now(timezone('UTC')))
-        except ValueError, OverflowError:
-            # year too long
-            holdTime = cal.parse("9999-12-31")
-        if holdTime[1] == 0:
-            # default time
-            holdTime = cal.parse("1 day", datetime.now(timezone('UTC')))
-            self._replyMessage = "**Defaulted to one day.**\n\n"
-        # Converting time
-        #9999/12/31 HH/MM/SS
-        self._replyDate = time.strftime('%Y-%m-%d %H:%M:%S', holdTime[0])
-        cmd = "INSERT INTO message_date (object_name, message, new_date, origin_date, userID) VALUES (%s, %s, %s, %s, %s)"
+        cmd = "INSERT INTO message_date (object_name, message, new_price, origin_price, userID) VALUES (%s, %s, %s, %s, %s)"
         self._addToDB.cursor.execute(cmd, (
                         self.comment.id.encode('utf-8'),
                         self._messageInput.encode('utf-8'),
-                        self._replyDate,
-                        self._originDate,
+                        self._storePrice,
+                        self._originPrice,
                         self.comment.author))
         self._addToDB.connection.commit()
         # Info is added to DB, user won't be bothered a second time
@@ -177,7 +165,7 @@ class Search(object):
         """
         permalink = self.comment.permalink
         self._replyMessage +=(
-            "I will be messaging you on [**{0} UTC**](http://www.wolframalpha.com/input/?i={0} UTC To Local Time)"
+            "I will be messaging you when the price of XRP reaches ${price}"
             " to remind you of [**this link.**]({commentPermalink})"
             "{remindMeMessage}")
 
@@ -185,22 +173,22 @@ class Search(object):
             self.sub = reddit.get_submission(self.comment.permalink)
         except Exception as err:
             print "link had http"
-        if self._privateMessage == False and self.sub.id not in self.subId:
+        if self._privateMessage is False and self.sub.id not in self.subId:
             remindMeMessage = (
-                "\n\n[**CLICK THIS LINK**](http://np.reddit.com/message/compose/?to=RemindMeBot&subject=Reminder&message="
-                "[{permalink}]%0A%0ARemindMe! {time}) to send a PM to also be reminded and to reduce spam."
+                "\n\n[**CLICK THIS LINK**](http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=Reminder&message="
+                "[{permalink}]%0A%0AxrpRemindMe! {time}) to send a PM to also be reminded and to reduce spam."
                 "\n\n^(Parent commenter can ) [^(delete this message to hide from others.)]"
-                "(http://np.reddit.com/message/compose/?to=RemindMeBot&subject=Delete Comment&message=Delete! ____id____)").format(
+                "(http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=Delete Comment&message=Delete! ____id____)").format(
                     permalink=permalink,
-                    time=self._storeTime.replace('\n', '')
+                    time=self._storePrice.replace('\n', '')
                 )
         else:
             remindMeMessage = ""
 
         self._replyMessage = self._replyMessage.format(
-                self._replyDate,
                 remindMeMessage=remindMeMessage,
-                commentPermalink=permalink)
+                commentPermalink=permalink,
+                price = self._storePrice)
         self._replyMessage += Search.endMessage
 
     def reply(self):
@@ -210,7 +198,7 @@ class Search(object):
 
         author = self.comment.author
         def send_message():
-            reddit.send_message(author, 'Hello, ' + str(author) + ' RemindMeBot Confirmation Sent', self._replyMessage)
+            reddit.send_message(author, 'Hello, ' + str(author) + ' xrpRemindMeBot Confirmation Sent', self._replyMessage)
 
         try:
             if self._privateMessage == False:
@@ -236,21 +224,17 @@ class Search(object):
             else:
                 print str(author)
                 send_message()
-        except RateLimitExceeded as err:
+        except APIException as err: # Catch any less specific API errors
+            print err
+        except PRAWException as err:
             print err
             # PM when I message too much
             send_message()
             time.sleep(10)
-        except Forbidden as err:
-            send_message()
-        except APIException as err: # Catch any less specific API errors
-            print err
-        #else:
-            #print self._replyMessage
 
     def find_bot_child_comment(self):
         """
-        Finds the remindmebot comment in the child
+        Finds the xrpRemindMeBot comment in the child
         """
         try:
             # Grabbing all child comments
@@ -259,7 +243,7 @@ class Search(object):
             commentfound = ""
             if replies:
                 for comment in replies:
-                    if str(comment.author) == "RemindMeBot":
+                    if str(comment.author) == "xrpRemindMeBot":
                         commentfound = comment
                 self.comment_count(commentfound)
         except Exception as err:
@@ -304,7 +288,7 @@ def grab_list_of_reminders(username):
     data = database.cursor.fetchall()
     table = (
             "[**Click here to delete all your reminders at once quickly.**]"
-            "(http://np.reddit.com/message/compose/?to=RemindMeBot&subject=Reminder&message=RemoveAll!)\n\n"
+            "(http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=Reminder&message=RemoveAll!)\n\n"
             "|Permalink|Message|Date|Remove|\n"
             "|-|-|-|:-:|")
     for row in data:
@@ -312,7 +296,7 @@ def grab_list_of_reminders(username):
         table += (
             "\n|" + row[0] + "|" +   row[1] + "|" + 
             "[" + date  + " UTC](http://www.wolframalpha.com/input/?i=" + str(row[2]) + " UTC to local time)|"
-            "[[X]](https://np.reddit.com/message/compose/?to=RemindMeBot&subject=Remove&message=Remove!%20"+ str(row[3]) + ")|"
+            "[[X]](https://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=Remove&message=Remove!%20"+ str(row[3]) + ")|"
             )
     if len(data) == 0: 
         table = "Looks like you have no reminders. Click the **[Custom]** button below to make one!"
@@ -359,7 +343,7 @@ def remove_all(username):
 
 def read_pm():
     try:
-        for message in reddit.get_unread(unset_has_mail=True, update_user=True, limit = 100):
+        for message in reddit.inbox.unread(limit = 100):
             # checks to see as some comments might be replys and non PMs
             prawobject = isinstance(message, praw.objects.Message)
             if (("xrpremindme" in message.body.lower() or
@@ -410,17 +394,16 @@ def check_comment(comment):
     Checks the body of the comment, looking for the command
     """
     redditCall = Search(comment)
-    if (("remindme!" in comment.body.lower() or
-        "!remindme" in comment.body.lower()) and 
+    if (("xrpremindme!" in comment.body.lower() or
+        "!xrpremindme" in comment.body.lower()) and
         redditCall.comment.id not in redditCall.commented and
-        'RemindMeBot' != str(comment.author) and
-        START_TIME < redditCall.comment.created_utc):
+        'xrpRemindMeBot' != str(comment.author)):
             print "in"
             t = Thread(target=redditCall.run())
             t.start()
 
 def check_own_comments():
-    user = reddit.get_redditor("RemindMeBot")
+    user = reddit.redditor("xrpRemindMeBot")
     for comment in user.get_comments(limit=None):
         if comment.score <= -5:
             print "COMMENT DELETED"
@@ -436,7 +419,8 @@ def main():
     while True:
         try:
             # grab the request
-            request = requests.get('https://api.pushshift.io/reddit/search?q=%22xrpRemindMe%22&limit=100',
+            START_TIME = 1517453178
+            request = requests.get('https://api.pushshift.io/reddit/search/comment/?q=%22xrpRemindMe%22&limit=100after=' + str(START_TIME),
                 headers = {'User-Agent': 'xrpRemindMeBot-Agent'})
             json = request.json()
             comments =  json["data"]
@@ -444,7 +428,7 @@ def main():
             for rawcomment in comments:
                 # object constructor requires empty attribute
                 rawcomment['_replies'] = ''
-                comment = praw.objects.Comment(reddit, rawcomment)
+                comment = praw.models.Comment(reddit, id = rawcomment["id"])
                 check_comment(comment)
 
             # Only check periodically 
@@ -453,6 +437,10 @@ def main():
                 checkcycle = 0
             else:
                 checkcycle += 1
+
+            lastrun_file = open("lastrunsearch.txt", "w")
+            lastrun_file.write(str(START_TIME))
+            lastrun_file.close()
 
             print "----"
             time.sleep(30)
