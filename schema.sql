@@ -17,7 +17,8 @@ CREATE TABLE `message_date` (
   `userID` varchar(50) DEFAULT NULL,
   `create_date` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `update_date` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  `permalink` varchar(400) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
-INSERT INTO comment_list (list) VALUES ('')
+INSERT INTO comment_list (list) VALUES ('');

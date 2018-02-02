@@ -439,7 +439,7 @@ def main():
                 checkcycle += 1
 
             lastrun_file = open("lastrunsearch.txt", "w")
-            lastrun_file.write(str(START_TIME))
+            lastrun_file.write(str(START_TIME ))
             lastrun_file.close()
 
             print "----"

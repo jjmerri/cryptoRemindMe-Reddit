@@ -6,7 +6,7 @@
 
 import praw
 import MySQLdb
-import ConfigParser
+import configparser
 import time
 import requests
 from datetime import datetime
@@ -20,7 +20,7 @@ from pytz import timezone
 # =============================================================================
 
 # Reads the config file
-config = ConfigParser.ConfigParser()
+config = configparser.ConfigParser()
 config.read("remindmebot.cfg")
 
 bot_username = config.get("Reddit", "username")
@@ -86,7 +86,7 @@ class Reply(object):
 
         lastrun_file = open("lastrun.txt", "r")
         current_time_sec = int(time.time())
-        mins_since_lastrun = (current_time_sec - int(lastrun_file.read())) / 60
+        mins_since_lastrun = (current_time_sec - int(lastrun_file.read())) // 60
 
         lastrun_file.close()
 
@@ -110,24 +110,24 @@ class Reply(object):
                 self._last_price_time = minute_data['time']
 
 
-    def parent_comment(self, dbPermalink):
+    def parent_comment(self, commentId):
         """
         Returns the parent comment or if it's a top comment
         return the original submission
         """
         try:
-            commentObj = reddit.comment(id=_force_utf8(dbPermalink))
+            commentObj = reddit.comment(id=_force_utf8(commentId))
             if commentObj.is_root:
                 return _force_utf8(commentObj.submission.permalink)
             else:
                 return _force_utf8(commentObj.parent().permalink)
         except IndexError as err:
-            print "parrent_comment error"
+            print("parrent_comment error")
             return "It seems your original comment was deleted, unable to return parent comment."
         # Catch any URLs that are not reddit comments
         except Exception  as err:
-            print err
-            print "HTTPError/PRAW parent comment"
+            print(err)
+            print("HTTPError/PRAW parent comment")
             return "Parent comment not required for this URL."
 
     def time_to_reply(self):
@@ -154,7 +154,7 @@ class Reply(object):
             if row[0] not in alreadyCommented:
                 flagDelete = False
                 # MySQl- object_name, message, create date, reddit user, new_price, origin_price
-                flagDelete = self.new_reply(row[1],row[2], row[6], row[5], row[3], row[4])
+                flagDelete = self.new_reply(row[1],row[2], row[6], row[5], row[3], row[4], row[8])
                 # removes row based on flagDelete
                 if flagDelete:
                     cmd = "DELETE FROM message_date WHERE id = %s" 
@@ -165,19 +165,19 @@ class Reply(object):
         self._queryDB.connection.commit()
         self._queryDB.connection.close()
 
-    def new_reply(self, object_name, message, create_date, author, new_price, origin_price):
+    def new_reply(self, object_name, message, create_date, author, new_price, origin_price, permalink):
         """
         Replies a second time to the user after a set amount of time
         """ 
         """
-        print self._replyMessage.format(
+        print(self._replyMessage.format(
                 message,
                 object_name
-            )
+            ))
         """
-        print "---------------"
-        print author
-        print object_name
+        print("---------------")
+        print(author)
+        print(object_name)
 
         origin_date_text = ""
         origin_date_text =  ("\n\nYou requested this reminder on: " 
@@ -195,7 +195,7 @@ class Reply(object):
         try:
             reddit.redditor(str(author)).message('Hello, ' + _force_utf8(str(author)) + ' RemindMeBot Here!', self._replyMessage.format(
                     message=_force_utf8(message),
-                    original=_force_utf8(object_name),
+                    original=_force_utf8(permalink),
                     parent= self.parent_comment(object_name),
                     origin_date_text = origin_date_text,
                     new_price = '${:,.2f}'.format(new_price),
@@ -203,24 +203,24 @@ class Reply(object):
                     price = '${:,.2f}'.format(self._low if new_price <= origin_price else self._high),
                     price_time = low_time_formatted if new_price <= origin_price else high_time_formatted
                 ))
-            print "Did It"
+            print("Did It")
             return True
         except APIException as err:
-            print "APIException", err
+            print("APIException", err)
             return False
         except IndexError as err:
-            print "IndexError", err
+            print("IndexError", err)
             return False
         except (HTTPError, ConnectionError, Timeout, timeout) as err:
-            print "HTTPError", err
+            print("HTTPError", err)
             time.sleep(10)
             return False
         except ClientException as err:
-            print "ClientException", err
+            print("ClientException", err)
             time.sleep(10)
             return False
         except PRAWException as err:
-            print "PRAWException", err
+            print("PRAWException", err)
             time.sleep(10)
             return False
 
@@ -234,20 +234,22 @@ def _force_unicode(text):
     if text == None:
         return u''
 
-    if isinstance(text, unicode):
+    if isinstance(text, str):
         return text
 
     try:
-        text = unicode(text, 'utf-8')
+        text = str(text, 'utf-8')
     except UnicodeDecodeError:
-        text = unicode(text, 'latin1')
+        text = str(text, 'latin1')
     except TypeError:
-        text = unicode(text)
+        text = str(text)
     return text
 
-
+'''
+Changed this to just return a string for now since upgrading python broke it. May need to implement in the future.
+'''
 def _force_utf8(text):
-    return str(_force_unicode(text).encode('utf8'))
+    return str(text)
 
 
 # =============================================================================
@@ -261,6 +263,10 @@ def main():
         checkReply.time_to_reply()
         checkReply.search_db()
 
+        #dont let 0 get into the lastrun.txt. It breaks the api call to get the prices
+        if not checkReply._last_price_time:
+            checkReply._last_price_time = 10000
+
         lastrun_file = open("lastrun.txt", "w")
         lastrun_file.write(str(checkReply._last_price_time))
         lastrun_file.close()
@@ -271,6 +277,6 @@ def main():
 # =============================================================================
 # RUNNER
 # =============================================================================
-print "start"
+print("start")
 if __name__ == '__main__':
     main()
