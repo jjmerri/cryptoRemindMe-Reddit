@@ -7,7 +7,7 @@ import traceback
 import praw
 import re
 import MySQLdb
-import ConfigParser
+import configparser
 import ast
 import time
 import urllib
@@ -21,7 +21,7 @@ from threading import Thread
 # =============================================================================
 
 # Reads the config file
-config = ConfigParser.ConfigParser()
+config = configparser.ConfigParser()
 config.read("remindmebot.cfg")
 
 bot_username = config.get("Reddit", "username")
@@ -172,7 +172,7 @@ class Search(object):
         try:
             self.sub = reddit.get_submission(self.comment.permalink)
         except Exception as err:
-            print "link had http"
+            print("link had http")
         if self._privateMessage is False and self.sub.id not in self.subId:
             remindMeMessage = (
                 "\n\n[**CLICK THIS LINK**](http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=Reminder&message="
@@ -222,12 +222,12 @@ class Search(object):
                 else:
                     send_message()
             else:
-                print str(author)
+                print(str(author))
                 send_message()
         except APIException as err: # Catch any less specific API errors
-            print err
+            print(err)
         except PRAWException as err:
-            print err
+            print(err)
             # PM when I message too much
             send_message()
             time.sleep(10)
@@ -387,7 +387,7 @@ def read_pm():
                 message.reply("I have deleted all **" + count + "** reminders for you.\n\n" + listOfReminders)
                 message.mark_as_read()
     except Exception as err:
-        print traceback.format_exc()
+        print(traceback.format_exc())
 
 def check_comment(comment):
     """
@@ -398,7 +398,7 @@ def check_comment(comment):
         "!xrpremindme" in comment.body.lower()) and
         redditCall.comment.id not in redditCall.commented and
         'xrpRemindMeBot' != str(comment.author)):
-            print "in"
+            print("in")
             t = Thread(target=redditCall.run())
             t.start()
 
@@ -406,15 +406,15 @@ def check_own_comments():
     user = reddit.redditor("xrpRemindMeBot")
     for comment in user.get_comments(limit=None):
         if comment.score <= -5:
-            print "COMMENT DELETED"
-            print comment
+            print("COMMENT DELETED")
+            print(comment)
             comment.delete()
 # =============================================================================
 # MAIN
 # =============================================================================
 
 def main():
-    print "start"
+    print("start")
     checkcycle = 0
     while True:
         try:
@@ -442,10 +442,10 @@ def main():
             lastrun_file.write(str(START_TIME ))
             lastrun_file.close()
 
-            print "----"
+            print("----")
             time.sleep(30)
         except Exception as err:
-            print traceback.format_exc()           
+            print(traceback.format_exc())
             time.sleep(30)
         """
         Will add later if problem with api.pushshift
@@ -454,7 +454,7 @@ def main():
             for comment in praw.helpers.comment_stream(reddit, 'all', limit = 1, verbosity = 0):
                 check_comment(comment)
         except Exception as err:
-           print err
+           print(err)
         """
 # =============================================================================
 # RUNNER
