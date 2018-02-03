@@ -42,7 +42,7 @@ DB_PASS = config.get("SQL", "passwd")
 # CLASSES
 # =============================================================================
 
-class Connect(object):
+class DbConnectiton(object):
     """
     DB connection class
     """
@@ -58,7 +58,7 @@ class Connect(object):
 class Reply(object):
 
     def __init__(self):
-        self._queryDB = Connect()
+        self._db_connection = DbConnectiton()
         self._replyMessage =(
             "xrpRemindMe private message here!" 
             "\n\n**The message:** \n\n>{message}"
@@ -75,13 +75,13 @@ class Reply(object):
             "\n|-|-|-|-|-|-|"
             )
         self._high = 0.00
-        self._low = 10000.00
-        self._last_price_time = 0
+        self._low = 100000.00
+        self.last_price_time = 0
 
 
-    def set_interval_extremes(self):
+    def set_price_extremes(self):
         """
-        Replies a second time to the user after a set amount of time
+        Sets the high and low since the last run
         """
 
         lastrun_file = open("lastrun.txt", "r")
@@ -106,21 +106,21 @@ class Reply(object):
                 self._low = low
                 self._low_time = minute_data['time']
 
-            if minute_data['time'] > self._last_price_time:
-                self._last_price_time = minute_data['time']
+            if minute_data['time'] > self.last_price_time:
+                self.last_price_time = minute_data['time']
 
 
-    def parent_comment(self, commentId):
+    def _parent_comment(self, commentId):
         """
         Returns the parent comment or if it's a top comment
         return the original submission
         """
         try:
-            commentObj = reddit.comment(id=_force_utf8(commentId))
-            if commentObj.is_root:
-                return _force_utf8(commentObj.submission.permalink)
+            comment = reddit.comment(id=commentId)
+            if comment.is_root:
+                return comment.submission.permalink
             else:
-                return _force_utf8(commentObj.parent().permalink)
+                return comment.parent().permalink
         except IndexError as err:
             print("parrent_comment error")
             return "It seems your original comment was deleted, unable to return parent comment."
@@ -130,50 +130,38 @@ class Reply(object):
             print("HTTPError/PRAW parent comment")
             return "Parent comment not required for this URL."
 
-    def time_to_reply(self):
+    def populate_reply_list(self):
         """
         Checks to see through SQL if net_date is < current time
         """
-
-        # get current time to compare
-        currentTime = datetime.now(timezone('UTC'))
-        currentTime = format(currentTime, '%Y-%m-%d %H:%M:%S')
         cmd = "SELECT * FROM message_date WHERE (new_price <= %s AND new_price >= origin_price) OR (new_price >= %s AND new_price <= origin_price)"
-        self._queryDB.cursor.execute(cmd, [self._high, self._low])
+        self._db_connection.cursor.execute(cmd, [self._high, self._low])
 
-    def search_db(self):
+    def send_replies(self):
         """
         Loop through data looking for which comments are old
         """
 
-        data = self._queryDB.cursor.fetchall()
-        alreadyCommented = []
+        data = self._db_connection.cursor.fetchall()
+        already_commented = []
         for row in data:
             # checks to make sure ID hasn't been commented already
             # For situtations where errors happened
-            if row[0] not in alreadyCommented:
-                flagDelete = False
+            if row[0] not in already_commented:
                 # MySQl- object_name, message, create date, reddit user, new_price, origin_price
-                flagDelete = self.new_reply(row[1],row[2], row[6], row[5], row[3], row[4], row[8])
-                # removes row based on flagDelete
-                if flagDelete:
+                delete_message = self._send_reply(row[1], row[2], str(row[6]), row[5], row[3], row[4], row[8])
+                if delete_message:
                     cmd = "DELETE FROM message_date WHERE id = %s" 
-                    self._queryDB.cursor.execute(cmd, [row[0]])
-                    self._queryDB.connection.commit()
-                    alreadyCommented.append(row[0])
+                    self._db_connection.cursor.execute(cmd, [row[0]])
+                    self._db_connection.connection.commit()
+                    already_commented.append(row[0])
 
-        self._queryDB.connection.commit()
-        self._queryDB.connection.close()
+        self._db_connection.connection.commit()
+        self._db_connection.connection.close()
 
-    def new_reply(self, object_name, message, create_date, author, new_price, origin_price, permalink):
+    def _send_reply(self, object_name, message, create_date, author, new_price, origin_price, permalink):
         """
         Replies a second time to the user after a set amount of time
-        """ 
-        """
-        print(self._replyMessage.format(
-                message,
-                object_name
-            ))
         """
         print("---------------")
         print(author)
@@ -181,22 +169,22 @@ class Reply(object):
 
         origin_date_text = ""
         origin_date_text =  ("\n\nYou requested this reminder on: " 
-                            "[" + _force_utf8(create_date) + " UTC](http://www.wolframalpha.com/input/?i="
-                             + _force_utf8(create_date) + " UTC To Local Time)")
+                            "[" + create_date + " UTC](http://www.wolframalpha.com/input/?i="
+                             + create_date + " UTC To Local Time)")
 
         high_time = datetime.utcfromtimestamp(self._high_time)
-        high_time_formatted = ("[" + _force_utf8(format(high_time, '%Y-%m-%d %H:%M:%S')) + " UTC](http://www.wolframalpha.com/input/?i="
-                             + _force_utf8(format(high_time, '%Y-%m-%d %H:%M:%S')) + " UTC To Local Time)")
+        high_time_formatted = ("[" + format(high_time, '%Y-%m-%d %H:%M:%S') + " UTC](http://www.wolframalpha.com/input/?i="
+                             + format(high_time, '%Y-%m-%d %H:%M:%S') + " UTC To Local Time)")
 
         low_time = datetime.utcfromtimestamp(self._low_time)
-        low_time_formatted = ("[" + _force_utf8(format(low_time, '%Y-%m-%d %H:%M:%S')) + " UTC](http://www.wolframalpha.com/input/?i="
-                             + _force_utf8(format(low_time, '%Y-%m-%d %H:%M:%S')) + " UTC To Local Time)")
+        low_time_formatted = ("[" + format(low_time, '%Y-%m-%d %H:%M:%S') + " UTC](http://www.wolframalpha.com/input/?i="
+                             + format(low_time, '%Y-%m-%d %H:%M:%S') + " UTC To Local Time)")
 
         try:
-            reddit.redditor(str(author)).message('Hello, ' + _force_utf8(str(author)) + ' RemindMeBot Here!', self._replyMessage.format(
-                    message=_force_utf8(message),
-                    original=_force_utf8(permalink),
-                    parent= self.parent_comment(object_name),
+            reddit.redditor(str(author)).message('Hello, ' + str(author) + ' RemindMeBot Here!', self._replyMessage.format(
+                    message=message,
+                    original=permalink,
+                    parent= self._parent_comment(object_name),
                     origin_date_text = origin_date_text,
                     new_price = '${:,.2f}'.format(new_price),
                     origin_price = '${:,.2f}'.format(origin_price),
@@ -225,10 +213,6 @@ class Reply(object):
             return False
 
 
-def _force_utf8(text):
-    return str(text).encode('utf-8')
-
-
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -236,16 +220,16 @@ def _force_utf8(text):
 def main():
     while True:
         checkReply = Reply()
-        checkReply.set_interval_extremes()
-        checkReply.time_to_reply()
-        checkReply.search_db()
+        checkReply.set_price_extremes()
+        checkReply.populate_reply_list()
+        checkReply.send_replies()
 
         #dont let 0 get into the lastrun.txt. It breaks the api call to get the prices
-        if not checkReply._last_price_time:
-            checkReply._last_price_time = 10000
+        if not checkReply.last_price_time:
+            checkReply.last_price_time = 10000
 
         lastrun_file = open("lastrun.txt", "w")
-        lastrun_file.write(str(checkReply._last_price_time))
+        lastrun_file.write(str(checkReply.last_price_time))
         lastrun_file.close()
 
         time.sleep(600)
