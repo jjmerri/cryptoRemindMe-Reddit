@@ -224,32 +224,9 @@ class Reply(object):
             time.sleep(10)
             return False
 
-"""
-From Reddit's Code 
-https://github.com/reddit/reddit/blob/master/r2/r2/lib/unicode.py
-Brought to attention thanks to /u/13steinj
-"""
-def _force_unicode(text):
 
-    if text == None:
-        return u''
-
-    if isinstance(text, str):
-        return text
-
-    try:
-        text = str(text, 'utf-8')
-    except UnicodeDecodeError:
-        text = str(text, 'latin1')
-    except TypeError:
-        text = str(text)
-    return text
-
-'''
-Changed this to just return a string for now since upgrading python broke it. May need to implement in the future.
-'''
 def _force_utf8(text):
-    return str(text)
+    return str(text).encode('utf-8')
 
 
 # =============================================================================

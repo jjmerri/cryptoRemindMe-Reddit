@@ -39,13 +39,14 @@ reddit = praw.Reddit(client_id=client_id,
 DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
 
-# Time when program was started
-START_TIME = time.time()
+#Dictionary to store current crypto prices
+current_price = {"XRP": 0.0}
+
 # =============================================================================
 # CLASSES
 # =============================================================================
 
-class Connect(object):
+class DbConnection(object):
     """
     DB connection class
     """
@@ -63,7 +64,7 @@ class Search(object):
     subId = [] # reddit threads already replied in
     
     # Fills subId with previous threads. Helpful for restarts
-    database = Connect()
+    database = DbConnection()
     cmd = "SELECT list FROM comment_list WHERE id = 1"
     database.cursor.execute(cmd)
     data = database.cursor.fetchall()
@@ -85,13 +86,12 @@ class Search(object):
         )
 
     def __init__(self, comment):
-        self._addToDB = Connect()
+        self._addToDB = DbConnection()
         self.comment = comment # Reddit comment Object
         self._messageInput = '"Hello, I\'m here to remind you to see the parent comment!"'
         self._storePrice = None
         self._replyMessage = ""
         self._replyDate = None
-        self._originPrice = datetime.fromtimestamp(comment.created_utc)
         self._privateMessage = False
         
     def run(self, privateMessage=False):
@@ -142,38 +142,41 @@ class Search(object):
         # Fix issue with dashes for parsedatetime lib
         tempString = tempString.replace('-', "/")
         # Remove xrpRemindMe!
-        self._storePrice = re.sub('(["].{0,9000}["])', '', tempString)[12:]
+        tempString= re.sub('(["].{0,9000}["])', '', tempString)[12:]
+        self._storePrice = re.sub('([$])', '', tempString)
     
     def save_to_db(self):
         """
         Saves the id of the comment, the current price, and the message to the DB
         """
-        cmd = "INSERT INTO message_date (object_name, message, new_price, origin_price, userID) VALUES (%s, %s, %s, %s, %s)"
+
+        cmd = "INSERT INTO message_date (object_name, message, new_price, origin_price, userID, permalink) VALUES (%s, %s, %s, %s, %s, %s)"
         self._addToDB.cursor.execute(cmd, (
                         self.comment.id.encode('utf-8'),
                         self._messageInput.encode('utf-8'),
                         self._storePrice,
-                        self._originPrice,
-                        self.comment.author))
+                        current_price["XRP"],
+                        self.comment.author,
+                        self.comment.permalink.encode('utf-8')))
         self._addToDB.connection.commit()
         # Info is added to DB, user won't be bothered a second time
         self.commented.append(self.comment.id)
 
-    def build_message(self):
+    def build_message(self, is_for_comment = True):
         """
         Buildng message for user
         """
         permalink = self.comment.permalink
-        self._replyMessage +=(
+        self._replyMessage =(
             "I will be messaging you when the price of XRP reaches ${price}"
             " to remind you of [**this link.**]({commentPermalink})"
             "{remindMeMessage}")
 
         try:
-            self.sub = reddit.get_submission(self.comment.permalink)
+            self.sub = reddit.comment(self.comment.id)
         except Exception as err:
-            print("link had http")
-        if self._privateMessage is False and self.sub.id not in self.subId:
+            print(err)
+        if self._privateMessage is False and is_for_comment and self.sub.id not in self.subId:
             remindMeMessage = (
                 "\n\n[**CLICK THIS LINK**](http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=Reminder&message="
                 "[{permalink}]%0A%0AxrpRemindMe! {time}) to send a PM to also be reminded and to reduce spam."
@@ -198,27 +201,27 @@ class Search(object):
 
         author = self.comment.author
         def send_message():
-            reddit.send_message(author, 'Hello, ' + str(author) + ' xrpRemindMeBot Confirmation Sent', self._replyMessage)
+            self.build_message(False)
+            reddit.redditor(str(author)).message('xrpRemindMeBot Confirmation Sent', self._replyMessage)
 
         try:
             if self._privateMessage == False:
                 # First message will be a reply in a thread
                 # afterwards are PM in the same thread
                 if (self.sub.id not in self.subId):
-                    newcomment = self.comment.reply(self._replyMessage)
                     self.subId.append(self.sub.id)
                     # adding it to database as well
-                    database = Connect()
+                    database = DbConnection()
                     insertsubid = ", \'" + self.sub.id + "\'"
                     cmd = 'UPDATE comment_list set list = CONCAT(list, "{0}") where id = 1'.format(insertsubid)
                     database.cursor.execute(cmd)
                     database.connection.commit()
                     database.connection.close()
+
+                    newcomment = self.comment.reply(self._replyMessage)
                     # grabbing comment just made
-                    reddit.get_info( 
-                            thing_id='t1_'+str(newcomment.id)
-                            # edit comment with self ID so it can be deleted
-                        ).edit(self._replyMessage.replace('____id____', str(newcomment.id))) 
+                    reddit.comment((newcomment.id)
+                        ).edit(self._replyMessage.replace('____id____', str(newcomment.id)))
                 else:
                     send_message()
             else:
@@ -226,6 +229,9 @@ class Search(object):
                 send_message()
         except APIException as err: # Catch any less specific API errors
             print(err)
+            if err.error_type == "RATELIMIT":
+                send_message()
+
         except PRAWException as err:
             print(err)
             # PM when I message too much
@@ -282,7 +288,7 @@ def grab_list_of_reminders(username):
     """
     Grabs all the reminders of the user
     """
-    database = Connect()
+    database = DbConnection()
     query = "SELECT object_name, message, new_date, id FROM message_date WHERE userid = %s ORDER BY new_date"
     database.cursor.execute(query, [username])
     data = database.cursor.fetchall()
@@ -309,7 +315,7 @@ def remove_reminder(username, idnum):
     """
     Deletes the reminder from the database
     """
-    database = Connect()
+    database = DbConnection()
     # only want userid to confirm if owner
     query = "SELECT userid FROM message_date WHERE id = %s"
     database.cursor.execute(query, [idnum])
@@ -331,7 +337,7 @@ def remove_all(username):
     """
     Deletes all reminders at once
     """
-    database = Connect()
+    database = DbConnection()
     query = "SELECT * FROM message_date where userid = %s"
     database.cursor.execute(query, [username])
     count = len(database.cursor.fetchall())
@@ -397,7 +403,8 @@ def check_comment(comment):
     if (("xrpremindme!" in comment.body.lower() or
         "!xrpremindme" in comment.body.lower()) and
         redditCall.comment.id not in redditCall.commented and
-        'xrpRemindMeBot' != str(comment.author)):
+        'xrpRemindMeBot' != str(comment.author) and
+        'xrpRemindMeTest' != str(comment.author)):
             print("in")
             t = Thread(target=redditCall.run())
             t.start()
@@ -409,6 +416,30 @@ def check_own_comments():
             print("COMMENT DELETED")
             print(comment)
             comment.delete()
+
+def update_crypto_prices():
+    """
+    updates supported crypto prices with current exchange price
+    """
+
+    r = requests.get("https://min-api.cryptocompare.com/data/pricemulti?fsyms=AID,BCH,BTC,DASH,EOS,ETC,ETH,ETP,GNT,LTC,MNA,NEO,OMG,RRT,SAN,SNG,SNT,SPK,XMR,XRP,ZEC&tsyms=USD&e=bitfinex")
+    response = r.json()
+
+    for price in response:
+        current_price[price] = response[price]["USD"]
+
+#returns the time saved in lastrunsearch.txt
+#returns 10000 if 0 is in the file because it will break the http call with 0
+def get_last_run_time():
+    lastrun_file = open("lastrunsearch.txt", "r")
+    last_run_time = int(lastrun_file.read())
+    lastrun_file.close()
+
+    if last_run_time:
+        return last_run_time
+    else:
+        return 10000
+
 # =============================================================================
 # MAIN
 # =============================================================================
@@ -416,16 +447,20 @@ def check_own_comments():
 def main():
     print("start")
     checkcycle = 0
+    last_processed_time = get_last_run_time()
     while True:
         try:
+            update_crypto_prices()
             # grab the request
-            START_TIME = 1517453178
-            request = requests.get('https://api.pushshift.io/reddit/search/comment/?q=%22xrpRemindMe%22&limit=100after=' + str(START_TIME),
+            request = requests.get('https://api.pushshift.io/reddit/search/comment/?q=%22xrpRemindMe%22&limit=100&after=' + str(last_processed_time),
                 headers = {'User-Agent': 'xrpRemindMeBot-Agent'})
             json = request.json()
             comments =  json["data"]
             read_pm()
             for rawcomment in comments:
+                if last_processed_time < rawcomment["created_utc"]:
+                    last_processed_time = rawcomment["created_utc"]
+
                 # object constructor requires empty attribute
                 rawcomment['_replies'] = ''
                 comment = praw.models.Comment(reddit, id = rawcomment["id"])
@@ -439,7 +474,7 @@ def main():
                 checkcycle += 1
 
             lastrun_file = open("lastrunsearch.txt", "w")
-            lastrun_file.write(str(START_TIME ))
+            lastrun_file.write(str(last_processed_time))
             lastrun_file.close()
 
             print("----")
