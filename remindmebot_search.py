@@ -42,6 +42,8 @@ DB_PASS = config.get("SQL", "passwd")
 #Dictionary to store current crypto prices
 current_price = {"XRP": 0.0}
 
+supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","ETC","ETH","LSK","LTC","MIOTA","NEO","QTUM","STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
+
 # =============================================================================
 # CLASSES
 # =============================================================================
@@ -416,7 +418,10 @@ def update_crypto_prices():
     updates supported crypto prices with current exchange price
     """
 
-    r = requests.get("https://min-api.cryptocompare.com/data/pricemulti?fsyms=AID,BCH,BTC,DASH,EOS,ETC,ETH,ETP,GNT,LTC,MNA,NEO,OMG,RRT,SAN,SNG,SNT,SPK,XMR,XRP,ZEC&tsyms=USD&e=bitfinex")
+    r = requests.get("https://min-api.cryptocompare.com/data/pricemulti?fsyms={supported_ticket_list}&tsyms=USD&e=CCCAGG"
+                    .format(
+                        supported_ticket_list = ','.join(map(str, supported_tickers))
+                    ))
     response = r.json()
 
     for price in response:

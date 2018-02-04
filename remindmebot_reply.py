@@ -38,6 +38,8 @@ reddit = praw.Reddit(client_id=client_id,
 DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
 
+supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","ETC","ETH","LSK","LTC","MIOTA","NEO","QTUM","STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
+
 # =============================================================================
 # CLASSES
 # =============================================================================
@@ -66,7 +68,7 @@ class Reply(object):
             "\n\n**The parent comment from the original comment or its submission:** \n\n>{parent}"
             "{origin_date_text}"
             "\n\nYou requested a reminder when the price reached {new_price} from {origin_price}."
-            "\n\nThe price hit {price} at {price_time} on bitfinex"
+            "\n\nThe price hit {price} at {price_time} using CryptoCompare's Current Aggregate."
             "\n\n_____\n\n"
             "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
             "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
@@ -90,7 +92,9 @@ class Reply(object):
 
         lastrun_file.close()
 
-        r = requests.get('https://min-api.cryptocompare.com/data/histominute?fsym=XRP&tsym=USD&e=bitfinex&limit=' + str(mins_since_lastrun))
+        for supported_ticker in supported_tickers:
+            r = requests.get('https://min-api.cryptocompare.com/data/histominute?fsym={ticker}&tsym=USD&e=CCCAGG&limit='.format(ticker=supported_ticker) + str(mins_since_lastrun))
+
         response = r.json()
         minutes_data = response['Data']
 
