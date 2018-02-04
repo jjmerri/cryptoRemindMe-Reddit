@@ -1,6 +1,6 @@
-DROP SCHEMA IF EXISTS xrp_remind_me;
-CREATE SCHEMA xrp_remind_me;
-USE xrp_remind_me;
+DROP SCHEMA IF EXISTS crypto_remind_me;
+CREATE SCHEMA crypto_remind_me;
+USE crypto_remind_me;
 
 CREATE TABLE `comment_list` (
   `list` longtext,
@@ -8,16 +8,17 @@ CREATE TABLE `comment_list` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 ;
 
-CREATE TABLE `message_date` (
+CREATE TABLE `reminder` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `object_name` varchar(400) NOT NULL DEFAULT '',
+  `object_name` varchar(400) NOT NULL,
   `message` varchar(11000) DEFAULT NULL,
-  `new_price` DECIMAL(12,6) DEFAULT NULL,
-  `origin_price` DECIMAL(12,6) DEFAULT NULL,
-  `userID` varchar(50) DEFAULT NULL,
+  `new_price` DECIMAL(18,9),
+  `origin_price` DECIMAL(18,9),
+  `userID` varchar(50),
   `create_date` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `update_date` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  `permalink` varchar(400) NOT NULL DEFAULT '',
+  `permalink` varchar(400) NOT NULL,
+  `ticker` varchar(50) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

@@ -32,7 +32,7 @@ client_secret = config.get("Reddit", "client_secret")
 reddit = praw.Reddit(client_id=client_id,
                      client_secret=client_secret,
                      password=bot_password,
-                     user_agent='xrpRemindMe by /u/boyAndHisBlob',
+                     user_agent='cryptoRemindMe by /u/boyAndHisBlob',
                      username=bot_username)
 # DB Info
 DB_USER = config.get("SQL", "user")
@@ -51,7 +51,7 @@ class DbConnectiton(object):
 
     def __init__(self):
         self.connection = MySQLdb.connect(
-            host="localhost", user=DB_USER, passwd=DB_PASS, db="xrp_remind_me"
+            host="localhost", user=DB_USER, passwd=DB_PASS, db="crypto_remind_me"
         )
         self.cursor = self.connection.cursor()
 
@@ -60,7 +60,7 @@ class Reply(object):
     def __init__(self):
         self._db_connection = DbConnectiton()
         self._replyMessage =(
-            "xrpRemindMe private message here!" 
+            "cryptoRemindMeBot private message here!" 
             "\n\n**The message:** \n\n>{message}"
             "\n\n**The original comment:** \n\n>{original}"
             "\n\n**The parent comment from the original comment or its submission:** \n\n>{parent}"
@@ -69,9 +69,9 @@ class Reply(object):
             "\n\nThe price hit {price} at {price_time} on bitfinex"
             "\n\n_____\n\n"
             "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
-            "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=xrpRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
-            "|[^(Feedback)](http://np.reddit.com/message/compose/?to=boyAndHisBlob&subject=xrpRemindMe Feedback)"
-            "|[^(Code)](https://github.com/jjmerri/xrpRemindMe-Reddit)"
+            "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
+            "|[^(Feedback)](http://np.reddit.com/message/compose/?to=boyAndHisBlob&subject=cryptoRemindMe Feedback)"
+            "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
             "\n|-|-|-|-|-|-|"
             )
         self._high = 0.00
@@ -134,7 +134,7 @@ class Reply(object):
         """
         Checks to see through SQL if net_date is < current time
         """
-        cmd = "SELECT * FROM message_date WHERE (new_price <= %s AND new_price >= origin_price) OR (new_price >= %s AND new_price <= origin_price)"
+        cmd = "SELECT * FROM reminder WHERE (new_price <= %s AND new_price >= origin_price) OR (new_price >= %s AND new_price <= origin_price)"
         self._db_connection.cursor.execute(cmd, [self._high, self._low])
 
     def send_replies(self):
@@ -151,7 +151,7 @@ class Reply(object):
                 # MySQl- object_name, message, create date, reddit user, new_price, origin_price
                 delete_message = self._send_reply(row[1], row[2], str(row[6]), row[5], row[3], row[4], row[8])
                 if delete_message:
-                    cmd = "DELETE FROM message_date WHERE id = %s" 
+                    cmd = "DELETE FROM reminder WHERE id = %s"
                     self._db_connection.cursor.execute(cmd, [row[0]])
                     self._db_connection.connection.commit()
                     already_commented.append(row[0])
