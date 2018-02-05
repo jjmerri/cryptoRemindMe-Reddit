@@ -79,6 +79,7 @@ class Reply(object):
         self._high = 0.00
         self._low = 100000.00
         self.last_price_time = 0
+        self._price_history = {}
 
 
     def set_price_extremes(self):
@@ -87,31 +88,32 @@ class Reply(object):
         """
 
         lastrun_file = open("lastrun.txt", "r")
-        current_time_sec = int(time.time())
-        mins_since_lastrun = (current_time_sec - int(lastrun_file.read())) // 60
+        lastrun_sec = int(lastrun_file.read())
 
         lastrun_file.close()
 
         for supported_ticker in supported_tickers:
+            current_time_sec = int(time.time())
+            mins_since_lastrun = (current_time_sec - lastrun_sec) // 60
             r = requests.get('https://min-api.cryptocompare.com/data/histominute?fsym={ticker}&tsym=USD&e=CCCAGG&limit='.format(ticker=supported_ticker) + str(mins_since_lastrun))
+            response = r.json()
+            self._price_history[supported_ticker] = response['Data']
 
-        response = r.json()
-        minutes_data = response['Data']
+            for minute_data in self._price_history[supported_ticker]:
 
-        for minute_data in minutes_data:
-            high = minute_data['high']
-            low = minute_data['low']
+                high = minute_data['high']
+                low = minute_data['low']
 
-            if high > self._high:
-                self._high = high
-                self._high_time = minute_data['time']
+                if self._price_history[supported_ticker + "_high"] is None or high > self._price_history[supported_ticker + "_high"]:
+                    self._price_history[supported_ticker + "_high"] = high
+                    self._price_history[supported_ticker + "_high_time"] = minute_data['time']
 
-            if low < self._low:
-                self._low = low
-                self._low_time = minute_data['time']
+                if self._price_history[supported_ticker + "_low"] is None or low < self._price_history[supported_ticker + "_low"]:
+                    self._price_history[supported_ticker + "_low"] = low
+                    self._price_history[supported_ticker + "_low_time"] = minute_data['time']
 
-            if minute_data['time'] > self.last_price_time:
-                self.last_price_time = minute_data['time']
+                if minute_data['time'] > self.last_price_time:
+                    self.last_price_time = minute_data['time']
 
 
     def _parent_comment(self, commentId):
