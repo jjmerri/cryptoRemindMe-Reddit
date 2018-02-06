@@ -19,6 +19,7 @@ CREATE TABLE `reminder` (
   `update_date` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `permalink` varchar(400) NOT NULL,
   `ticker` varchar(50) NOT NULL,
+  `comment_create_datetime` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 

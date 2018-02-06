@@ -38,7 +38,7 @@ reddit = praw.Reddit(client_id=client_id,
 DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
 
-supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","ETC","ETH","LSK","LTC","MIOTA","NEO","QTUM","STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
+supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","ETC","ETH","LSK","LTC","NEO","QTUM","STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
 
 # =============================================================================
 # CLASSES
@@ -78,7 +78,7 @@ class Reply(object):
             )
         self._high = 0.00
         self._low = 100000.00
-        self.last_price_time = 0
+        self.last_price_time = {}
         self._price_history = {}
 
 
@@ -88,13 +88,19 @@ class Reply(object):
         """
 
         lastrun_file = open("lastrun.txt", "r")
-        lastrun_sec = int(lastrun_file.read())
+        lastrun_sec = {}
+        for lastrun in lastrun_file.read().splitlines():
+            values = lastrun.split(" ")
+            lastrun_sec[values[0]] = int(values[1])
 
         lastrun_file.close()
 
         for supported_ticker in supported_tickers:
             current_time_sec = int(time.time())
-            mins_since_lastrun = (current_time_sec - lastrun_sec) // 60
+            mins_since_lastrun = (current_time_sec - lastrun_sec[supported_ticker]) // 60
+            #Get data from at least 10 min back
+            mins_since_lastrun = mins_since_lastrun if mins_since_lastrun >= 10 else 10
+
             r = requests.get('https://min-api.cryptocompare.com/data/histominute?fsym={ticker}&tsym=USD&e=CCCAGG&limit='.format(ticker=supported_ticker) + str(mins_since_lastrun))
             response = r.json()
             self._price_history[supported_ticker] = response['Data']
@@ -104,16 +110,16 @@ class Reply(object):
                 high = minute_data['high']
                 low = minute_data['low']
 
-                if self._price_history[supported_ticker + "_high"] is None or high > self._price_history[supported_ticker + "_high"]:
+                if (supported_ticker + "_high") not in self._price_history or high > self._price_history[supported_ticker + "_high"]:
                     self._price_history[supported_ticker + "_high"] = high
                     self._price_history[supported_ticker + "_high_time"] = minute_data['time']
 
-                if self._price_history[supported_ticker + "_low"] is None or low < self._price_history[supported_ticker + "_low"]:
+                if (supported_ticker + "_low") not in self._price_history or low < self._price_history[supported_ticker + "_low"]:
                     self._price_history[supported_ticker + "_low"] = low
                     self._price_history[supported_ticker + "_low_time"] = minute_data['time']
 
-                if minute_data['time'] > self.last_price_time:
-                    self.last_price_time = minute_data['time']
+                if supported_ticker not in self.last_price_time or minute_data['time'] > self.last_price_time[supported_ticker]:
+                    self.last_price_time[supported_ticker] = minute_data['time']
 
 
     def _parent_comment(self, commentId):
@@ -140,8 +146,25 @@ class Reply(object):
         """
         Checks to see through SQL if net_date is < current time
         """
-        cmd = "SELECT * FROM reminder WHERE (new_price <= %s AND new_price >= origin_price) OR (new_price >= %s AND new_price <= origin_price)"
-        self._db_connection.cursor.execute(cmd, [self._high, self._low])
+        select_statement = "SELECT * FROM reminder WHERE "
+        single_where_clause = "(new_price <= %s AND new_price >= origin_price AND ticker = %s) OR (new_price >= %s AND new_price <= origin_price AND ticker = %s)"
+        where_clause = ((single_where_clause + " AND ") * len(supported_tickers))[0:-5]
+        cmd = select_statement + where_clause
+
+        cmd_args = []
+
+        for supported_ticker in supported_tickers:
+            if (supported_ticker + "_high") in self._price_history and (supported_ticker + "_low") in self._price_history:
+                cmd_args.append(self._price_history[supported_ticker + "_high"])
+                cmd_args.append(supported_ticker)
+                cmd_args.append(self._price_history[supported_ticker + "_low"])
+                cmd_args.append(supported_ticker)
+            else:
+                #remove a where clause + " AND "
+                cmd_minus_where_length = len(single_where_clause) + 5
+                cmd = cmd[:(cmd_minus_where_length * -1)]
+
+        self._db_connection.cursor.execute(cmd, cmd_args)
 
     def send_replies(self):
         """
@@ -154,18 +177,43 @@ class Reply(object):
             # checks to make sure ID hasn't been commented already
             # For situtations where errors happened
             if row[0] not in already_commented:
-                # MySQl- object_name, message, create date, reddit user, new_price, origin_price
-                delete_message = self._send_reply(row[1], row[2], str(row[6]), row[5], row[3], row[4], row[8])
-                if delete_message:
-                    cmd = "DELETE FROM reminder WHERE id = %s"
-                    self._db_connection.cursor.execute(cmd, [row[0]])
-                    self._db_connection.connection.commit()
-                    already_commented.append(row[0])
+                ticker = row[9]
+                object_name = row[1]
+                new_price = row[3]
+                origin_price = row[4]
+                comment_create_datetime = row[10]
+
+                send_reply = False
+                comment = None
+
+                try:
+                    for minute_data in self._price_history[ticker]:
+                        price_high = minute_data['high']
+                        price_low = minute_data['low']
+                        price_time = minute_data['time']
+
+                except IndexError as err:
+                    print("send_replies")
+                    send_reply = False
+                # Catch any URLs that are not reddit comments
+                except Exception  as err:
+                    print(err)
+                    print("HTTPError/PRAW send_replies")
+                    send_reply = False
+
+                if send_reply:
+                    # MySQl- object_name, message, create date, reddit user, new_price, origin_price, permalink, ticker
+                    delete_message = self._send_reply(object_name, row[2], str(row[6]), row[5], new_price, origin_price, row[8], ticker)
+                    if delete_message:
+                        cmd = "DELETE FROM reminder WHERE id = %s"
+                        self._db_connection.cursor.execute(cmd, [row[0]])
+                        self._db_connection.connection.commit()
+                        already_commented.append(row[0])
 
         self._db_connection.connection.commit()
         self._db_connection.connection.close()
 
-    def _send_reply(self, object_name, message, create_date, author, new_price, origin_price, permalink):
+    def _send_reply(self, object_name, message, create_date, author, new_price, origin_price, permalink, ticker):
         """
         Replies a second time to the user after a set amount of time
         """
@@ -218,6 +266,19 @@ class Reply(object):
             time.sleep(10)
             return False
 
+def update_last_run(checkReply):
+    lastrun_tickers = ""
+    for supported_ticker in supported_tickers:
+        # dont let 0 get into the lastrun.txt. It breaks the api call to get the prices
+        if supported_ticker not in checkReply.last_price_time:
+            checkReply.last_price_time[supported_ticker] = 10000
+
+        lastrun_tickers += supported_ticker + " " + str(
+            checkReply.last_price_time.get(supported_ticker, "10000")) + "\n"
+
+    lastrun_file = open("lastrun.txt", "w")
+    lastrun_file.write(lastrun_tickers)
+    lastrun_file.close()
 
 # =============================================================================
 # MAIN
@@ -225,19 +286,15 @@ class Reply(object):
 
 def main():
     while True:
+        print("Start Main Loop")
         checkReply = Reply()
         checkReply.set_price_extremes()
         checkReply.populate_reply_list()
         checkReply.send_replies()
 
-        #dont let 0 get into the lastrun.txt. It breaks the api call to get the prices
-        if not checkReply.last_price_time:
-            checkReply.last_price_time = 10000
+        update_last_run(checkReply)
 
-        lastrun_file = open("lastrun.txt", "w")
-        lastrun_file.write(str(checkReply.last_price_time))
-        lastrun_file.close()
-
+        print("End Main Loop")
         time.sleep(600)
 
 

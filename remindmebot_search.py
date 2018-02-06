@@ -95,6 +95,7 @@ class Search(object):
         self._reply_message = ""
         self._replyDate = None
         self._privateMessage = False
+        self._originDate = datetime.fromtimestamp(comment.created_utc)
         
     def run(self, privateMessage=False):
         self._privateMessage = privateMessage
@@ -142,7 +143,7 @@ class Search(object):
         Saves the id of the comment, the current price, and the message to the DB
         """
 
-        cmd = "INSERT INTO reminder (object_name, message, new_price, origin_price, userID, permalink, ticker) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        cmd = "INSERT INTO reminder (object_name, message, new_price, origin_price, userID, permalink, ticker, comment_create_datetime) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
         self._db_connection.cursor.execute(cmd, (
                         self.comment.id.encode('utf-8'),
                         self._message_input.encode('utf-8') if self._message_input else None,
@@ -150,7 +151,8 @@ class Search(object):
                         current_price[self._ticker],
                         self.comment.author,
                         self.comment.permalink.encode('utf-8'),
-                        self._ticker.encode('utf-8')))
+                        self._ticker.encode('utf-8'),
+                        self._originDate))
         self._db_connection.connection.commit()
         # Info is added to DB, user won't be bothered a second time
         self.commented.append(self.comment.id)
