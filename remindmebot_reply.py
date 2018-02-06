@@ -67,7 +67,7 @@ class Reply(object):
             "\n\n**The original comment:** \n\n>{original}"
             "\n\n**The parent comment from the original comment or its submission:** \n\n>{parent}"
             "{origin_date_text}"
-            "\n\nYou requested a reminder when the price reached {new_price} from {origin_price}."
+            "\n\nYou requested a reminder when the price of {ticker} reached {new_price} from {origin_price}."
             "\n\nThe price hit {price} at {price_time} using CryptoCompare's Current Aggregate."
             "\n\n_____\n\n"
             "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
@@ -76,8 +76,6 @@ class Reply(object):
             "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
             "\n|-|-|-|-|-|-|"
             )
-        self._high = 0.00
-        self._low = 100000.00
         self.last_price_time = {}
         self._price_history = {}
 
@@ -91,13 +89,19 @@ class Reply(object):
         lastrun_sec = {}
         for lastrun in lastrun_file.read().splitlines():
             values = lastrun.split(" ")
-            lastrun_sec[values[0]] = int(values[1])
+            if len(values) == 2:
+                lastrun_sec[values[0]] = int(values[1])
 
         lastrun_file.close()
 
         for supported_ticker in supported_tickers:
             current_time_sec = int(time.time())
-            mins_since_lastrun = (current_time_sec - lastrun_sec[supported_ticker]) // 60
+            if supported_ticker in lastrun_sec:
+                mins_since_lastrun = (current_time_sec - lastrun_sec[supported_ticker]) // 60
+            else:
+                #max allowed by API
+                mins_since_lastrun = 2000
+
             #Get data from at least 10 min back
             mins_since_lastrun = mins_since_lastrun if mins_since_lastrun >= 10 else 10
 
@@ -184,7 +188,8 @@ class Reply(object):
                 comment_create_datetime = row[10]
 
                 send_reply = False
-                comment = None
+                message_price = 0.0
+                message_price_time = 0
 
                 try:
                     for minute_data in self._price_history[ticker]:
@@ -192,8 +197,21 @@ class Reply(object):
                         price_low = minute_data['low']
                         price_time = minute_data['time']
 
+                        if price_time >= comment_create_datetime:
+                            if new_price <= price_high and new_price >= origin_price:
+                                message_price = price_high
+                            elif new_price >= price_low and new_price <= origin_price:
+                                message_price = price_low
+                            else:
+                                print("This is how the world ends")
+
+                            message_price_time = price_time
+                            send_reply = True
+                            break
+
                 except IndexError as err:
-                    print("send_replies")
+                    print(err)
+                    print("IndexError in send_replies")
                     send_reply = False
                 # Catch any URLs that are not reddit comments
                 except Exception  as err:
@@ -202,8 +220,8 @@ class Reply(object):
                     send_reply = False
 
                 if send_reply:
-                    # MySQl- object_name, message, create date, reddit user, new_price, origin_price, permalink, ticker
-                    delete_message = self._send_reply(object_name, row[2], str(row[6]), row[5], new_price, origin_price, row[8], ticker)
+                    # MySQl- object_name, message, create date, reddit user, new_price, origin_price, permalink, ticker, message_price_time, message_price
+                    delete_message = self._send_reply(object_name, row[2], str(row[6]), row[5], new_price, origin_price, row[8], ticker, message_price_time, message_price)
                     if delete_message:
                         cmd = "DELETE FROM reminder WHERE id = %s"
                         self._db_connection.cursor.execute(cmd, [row[0]])
@@ -213,7 +231,7 @@ class Reply(object):
         self._db_connection.connection.commit()
         self._db_connection.connection.close()
 
-    def _send_reply(self, object_name, message, create_date, author, new_price, origin_price, permalink, ticker):
+    def _send_reply(self, object_name, message, create_date, author, new_price, origin_price, permalink, ticker, message_price_time, message_price):
         """
         Replies a second time to the user after a set amount of time
         """
@@ -221,31 +239,27 @@ class Reply(object):
         print(author)
         print(object_name)
 
-        origin_date_text = ""
         origin_date_text =  ("\n\nYou requested this reminder on: " 
                             "[" + create_date + " UTC](http://www.wolframalpha.com/input/?i="
                              + create_date + " UTC To Local Time)")
 
-        high_time = datetime.utcfromtimestamp(self._high_time)
-        high_time_formatted = ("[" + format(high_time, '%Y-%m-%d %H:%M:%S') + " UTC](http://www.wolframalpha.com/input/?i="
-                             + format(high_time, '%Y-%m-%d %H:%M:%S') + " UTC To Local Time)")
-
-        low_time = datetime.utcfromtimestamp(self._low_time)
-        low_time_formatted = ("[" + format(low_time, '%Y-%m-%d %H:%M:%S') + " UTC](http://www.wolframalpha.com/input/?i="
-                             + format(low_time, '%Y-%m-%d %H:%M:%S') + " UTC To Local Time)")
+        message_price_datetime = datetime.utcfromtimestamp(message_price_time)
+        message_price_datetime_formatted = ("[" + format(message_price_datetime, '%Y-%m-%d %H:%M:%S') + " UTC](http://www.wolframalpha.com/input/?i="
+                             + format(message_price_datetime, '%Y-%m-%d %H:%M:%S') + " UTC To Local Time)")
 
         try:
-            reddit.redditor(str(author)).message('Hello, ' + str(author) + ' RemindMeBot Here!', self._replyMessage.format(
+            reddit.redditor(str(author)).message('Hello, ' + str(author) + ' cryptoRemindMeBot Here!', self._replyMessage.format(
                     message=message,
                     original=permalink,
                     parent= self._parent_comment(object_name),
                     origin_date_text = origin_date_text,
                     new_price = '${:,.2f}'.format(new_price),
                     origin_price = '${:,.2f}'.format(origin_price),
-                    price = '${:,.2f}'.format(self._low if new_price <= origin_price else self._high),
-                    price_time = low_time_formatted if new_price <= origin_price else high_time_formatted
+                    price = '${:,.2f}'.format(message_price),
+                    price_time = message_price_datetime_formatted,
+                    ticker = ticker
                 ))
-            print("Did It")
+            print("Sent Reply")
             return True
         except APIException as err:
             print("APIException", err)
