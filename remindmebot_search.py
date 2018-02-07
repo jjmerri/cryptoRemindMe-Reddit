@@ -95,7 +95,7 @@ class Search(object):
         self._reply_message = ""
         self._replyDate = None
         self._privateMessage = False
-        self._originDate = datetime.fromtimestamp(comment.created_utc)
+        self._origin_date = datetime.fromtimestamp(comment.created_utc)
         
     def run(self, privateMessage=False):
         self._privateMessage = privateMessage
@@ -152,7 +152,7 @@ class Search(object):
                         self.comment.author,
                         self.comment.permalink.encode('utf-8'),
                         self._ticker.encode('utf-8'),
-                        self._originDate))
+                        self._origin_date))
         self._db_connection.connection.commit()
         # Info is added to DB, user won't be bothered a second time
         self.commented.append(self.comment.id)

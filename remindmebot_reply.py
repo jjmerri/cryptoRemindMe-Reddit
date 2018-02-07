@@ -13,7 +13,6 @@ from datetime import datetime
 from requests.exceptions import HTTPError, ConnectionError, Timeout
 from praw.exceptions import APIException, ClientException, PRAWException
 from socket import timeout
-from pytz import timezone
 
 # =============================================================================
 # GLOBALS
@@ -152,7 +151,7 @@ class Reply(object):
         """
         select_statement = "SELECT * FROM reminder WHERE "
         single_where_clause = "(new_price <= %s AND new_price >= origin_price AND ticker = %s) OR (new_price >= %s AND new_price <= origin_price AND ticker = %s)"
-        where_clause = ((single_where_clause + " AND ") * len(supported_tickers))[0:-5]
+        where_clause = ((single_where_clause + " OR ") * len(supported_tickers))[0:-4]
         cmd = select_statement + where_clause
 
         cmd_args = []
@@ -165,7 +164,7 @@ class Reply(object):
                 cmd_args.append(supported_ticker)
             else:
                 #remove a where clause + " AND "
-                cmd_minus_where_length = len(single_where_clause) + 5
+                cmd_minus_where_length = len(single_where_clause) + 4
                 cmd = cmd[:(cmd_minus_where_length * -1)]
 
         self._db_connection.cursor.execute(cmd, cmd_args)
@@ -197,7 +196,7 @@ class Reply(object):
                         price_low = minute_data['low']
                         price_time = minute_data['time']
 
-                        if price_time >= comment_create_datetime:
+                        if price_time >= comment_create_datetime.timestamp():
                             if new_price <= price_high and new_price >= origin_price:
                                 message_price = price_high
                             elif new_price >= price_low and new_price <= origin_price:
