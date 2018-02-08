@@ -10,7 +10,7 @@ import MySQLdb
 import configparser
 import ast
 import time
-import urllib
+import os
 import requests
 from datetime import datetime
 from praw.exceptions import APIException, PRAWException
@@ -131,13 +131,16 @@ class Search(object):
         """
         response_message = None
         command_regex = r'!?cryptoRemindMe!?[ ]+(?P<ticker>[^ ]+)[ ]+\$?(?P<price>(([\d,]+(\.\d+)?)|(([\d,]+)?\.\d+)))([ ]+)?(?P<message>"[^"]+")?'
+        request_id_regex = r'\[(?P<request_id>[a-zA-Z0-9_.-]+)\]'
 
         if self._privateMessage == True:
-            permalink_temp = re.search('\[(.*?)\]', self.comment.body)
-            if permalink_temp:
-                self.comment.permalink = permalink_temp.group()[1:-1]
+            request_id = re.search(request_id_regex, self.comment.body)
+            if request_id and is_valid_comment_id(request_id.group("request_id")):
+                self.comment.id = request_id.group()[1:-1]
+                self.comment.permalink = "http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/"
             else:
                 # Defaults when the user doesn't provide a link
+                self.comment.id = "24duzp"
                 self.comment.permalink = "http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/"
 
         # remove cryptoRemindMe! or !cryptoRemindMe (case insenstive)
@@ -192,10 +195,10 @@ class Search(object):
         if self._privateMessage is False and is_for_comment and self.sub.id not in self.subId:
             remindMeMessage = (
                 "\n\n[**CLICK THIS LINK**](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=Reminder&message="
-                "[{permalink}]%0A%0AcryptoRemindMe! {ticker} ${price}) to send a PM to also be reminded and to reduce spam."
+                "[{id}]%0A%0AcryptoRemindMe! {ticker} ${price}) to send a PM to also be reminded and to reduce spam."
                 "\n\n^(Parent commenter can ) [^(delete this message to hide from others.)]"
                 "(http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=Delete Comment&message=Delete! ____id____)").format(
-                    permalink=permalink,
+                    id=self.comment.id,
                     price=self._store_price.replace('\n', ''),
                     ticker = self._ticker
                 )
@@ -218,7 +221,7 @@ class Search(object):
         author = self.comment.author
         def send_message():
             self._build_message(False)
-            reddit.redditor(str(author)).message('cryptoRemindMeBot Confirmation Sent', self._reply_message)
+            reddit.redditor(str(author)).message('cryptoRemindMeBot Confirmation', self._reply_message)
 
         try:
             if self._privateMessage == False:
@@ -300,6 +303,16 @@ class Search(object):
             count + " OTHERS CLICKED THIS LINK", 
             body)
         comment.edit(body)
+
+def is_valid_comment_id(comment_id):
+    is_valid = False
+    try:
+        comment = praw.models.Comment(id = comment_id)
+    except Exception as err:
+        print(err)
+        is_valid = False
+
+    return is_valid
 
 def get_message_footer():
     return (
@@ -527,12 +540,20 @@ def get_last_run_time():
     else:
         return 10000
 
+def create_lastrun():
+    if not os.path.isfile("lastrunsearch.txt"):
+        lastrun_file = open("lastrunsearch.txt", "w")
+        lastrun_file.write("0")
+        lastrun_file.close()
+
+
 # =============================================================================
 # MAIN
 # =============================================================================
 
 def main():
     print("start")
+    create_lastrun()
     checkcycle = 0
     last_processed_time = get_last_run_time()
     while True:
