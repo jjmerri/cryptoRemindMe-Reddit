@@ -15,6 +15,7 @@ import requests
 from datetime import datetime
 from praw.exceptions import APIException, PRAWException
 from threading import Thread
+from enum import Enum
 
 # =============================================================================
 # GLOBALS
@@ -33,7 +34,7 @@ client_secret = config.get("Reddit", "client_secret")
 reddit = praw.Reddit(client_id=client_id,
                      client_secret=client_secret,
                      password=bot_password,
-                     user_agent='cryptoRemindMe by /u/boyAndHisBlob',
+                     user_agent='cryptoRemindMe by /u/BoyAndHisBlob',
                      username=bot_username)
 
 DB_USER = config.get("SQL", "user")
@@ -47,6 +48,10 @@ supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","ETC","ETH","LSK","LTC
 # =============================================================================
 # CLASSES
 # =============================================================================
+class ParseMessage(Enum):
+    SUCCESS = 1
+    SYNTAX_ERROR = 2
+    UNSUPPORTED_TICKER = 3
 
 class DbConnection(object):
     """
@@ -74,18 +79,6 @@ class Search(object):
     database.connection.commit()
     database.connection.close()
 
-    endMessage = (
-        "\n\n_____\n\n"
-        "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
-        "|[^(Custom)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=Reminder&message="
-            "[LINK INSIDE SQUARE BRACKETS else default to FAQs]%0A%0A"
-            "NOTE: Don't forget to add the ticker and price after the command.%0A%0AcryptoRemindMe!)"
-        "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
-        "|[^(Feedback)](http://np.reddit.com/message/compose/?to=boyAndHisBlob&subject=Feedback)"
-        "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
-        "\n|-|-|-|-|-|-|"
-        )
-
     def __init__(self, comment):
         self._db_connection = DbConnection()
         self.comment = comment # Reddit comment Object
@@ -96,34 +89,53 @@ class Search(object):
         self._replyDate = None
         self._privateMessage = False
         self._origin_date = datetime.fromtimestamp(comment.created_utc)
-        
+        self.endMessage = get_message_footer()
+
     def run(self, privateMessage=False):
+        parsed_command = None
         self._privateMessage = privateMessage
-        self._parse_comment()
-        self._save_to_db()
-        self._build_message()
-        self._reply()
+        try:
+            parsed_command = self._parse_comment()
+        except Exception as err:
+            print(err)
+            parsed_command = None
+
+        if parsed_command == ParseMessage.SUCCESS:
+            try:
+                self._save_to_db()
+                self._build_message()
+                self._reply()
+            except Exception as err:
+                print(err)
+                send_message_generic_error(self.comment)
+        elif parsed_command == ParseMessage.SYNTAX_ERROR:
+            send_message_syntax(self.comment)
+        elif parsed_command == ParseMessage.UNSUPPORTED_TICKER:
+            send_message_unsupported_ticker(self.comment, self._ticker)
+        elif parsed_command is None:
+            send_message_generic_error(self.comment)
+
+
         if self._privateMessage == True:
             # Makes sure to marks as read, even if the above doesn't work
-            self.comment.mark_as_read()
-            self._find_bot_child_comment()
+            self.comment.mark_read()
+            if parsed_command == ParseMessage.SUCCESS:
+                self._find_bot_child_comment()
+
         self._db_connection.connection.close()
 
     def _parse_comment(self):
         """
         Parse comment looking for the message and price
+        :returns True or False based on successful parsing
         """
-        command_regex = r'!?cryptoRemindMe!?[ ]+(?P<ticker>[^ ]+)[ ]+\$?(?P<price>[\d,]+(\.\d+)?)([ ]+)?(?P<message>"[^"]+")?'
+        response_message = None
+        command_regex = r'!?cryptoRemindMe!?[ ]+(?P<ticker>[^ ]+)[ ]+\$?(?P<price>(([\d,]+(\.\d+)?)|(([\d,]+)?\.\d+)))([ ]+)?(?P<message>"[^"]+")?'
 
         if self._privateMessage == True:
             permalink_temp = re.search('\[(.*?)\]', self.comment.body)
             if permalink_temp:
                 self.comment.permalink = permalink_temp.group()[1:-1]
-                # Makes sure the URL is real
-                try:
-                    urllib.urlopen(self.comment.permalink)
-                except IOError:
-                    self.comment.permalink = "http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/"
             else:
                 # Defaults when the user doesn't provide a link
                 self.comment.permalink = "http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/"
@@ -131,13 +143,19 @@ class Search(object):
         # remove cryptoRemindMe! or !cryptoRemindMe (case insenstive)
         match = re.search(command_regex, self.comment.body, re.IGNORECASE)
 
-        if match:
+        if match and match.group("ticker") and match.group("price"):
             self._ticker = match.group("ticker").upper()
             self._store_price = match.group("price").replace(",","")
             self._message_input = match.group("message")
+
+            if self._ticker not in supported_tickers:
+                response_message = ParseMessage.UNSUPPORTED_TICKER
+            else:
+                response_message = ParseMessage.SUCCESS
         else:
-            #Respond with correct format
-            pass
+            response_message = ParseMessage.SYNTAX_ERROR
+
+        return response_message
     def _save_to_db(self):
         """
         Saves the id of the comment, the current price, and the message to the DB
@@ -190,7 +208,7 @@ class Search(object):
                 price = self._store_price,
                 ticker = self._ticker,
                 current_price = current_price[self._ticker])
-        self._reply_message += Search.endMessage
+        self._reply_message += self.endMessage
 
     def _reply(self):
         """
@@ -242,7 +260,7 @@ class Search(object):
         """
         try:
             # Grabbing all child comments
-            replies = reddit.get_submission(url=self.comment.permalink).comments[0].replies
+            replies = reddit.submission(url= 'https://www.reddit.com' + self.comment.permalink).comments.list()
             # Look for bot's reply
             commentfound = ""
             if replies:
@@ -251,7 +269,7 @@ class Search(object):
                         commentfound = comment
                 self.comment_count(commentfound)
         except Exception as err:
-            pass
+            print(err)
             
     def comment_count(self, commentfound):
         """
@@ -282,6 +300,74 @@ class Search(object):
             count + " OTHERS CLICKED THIS LINK", 
             body)
         comment.edit(body)
+
+def get_message_footer():
+    return (
+        "\n\n_____\n\n"
+        "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
+        "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
+        "|[^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=Feedback)"
+        "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
+        "\n|-|-|-|-|-|-|"
+    )
+def send_message_syntax(comment):
+    """
+    PMs the user with the correct syntax to use.
+    """
+    message_subject = "cryptoRemindMe Syntax Error"
+    message_body = ("Hello {author},\n\n"
+                   "[Your request]({permalink}) could not be processed because [you used the incorrect syntax.]({fail_link})\n\n"
+                   "Please try again using the following syntax:\n\n"
+                    "cryptoRemindMe! {{ticker}} {{price}} {{optional_message}}\n\n"
+                    "Example:\n\n"
+                    'cryptoRemindMe! xrp $1.25 "Some reason I wanted this reminder"\n\n'
+                    '{footer}')
+
+    reddit.redditor(str(comment.author)).message(message_subject, message_body.format(
+        author = str(comment.author),
+        permalink = str(comment.permalink),
+        fail_link = "https://media.giphy.com/media/87I8pKmdcAKw8/giphy.gif",
+        footer = get_message_footer()
+    ))
+
+def send_message_unsupported_ticker(comment, ticker):
+    """
+    PMs the user with a generic error
+    """
+    message_subject = "cryptoRemindMe Unsupported Cryptocurrency"
+    message_body = ("Hello {author},\n\n"
+                    "[Sorry]({sorry_link}) but {ticker} is not currently supported "
+                    "so [your request]({permalink}) couldn't be processed.\n\n"
+                    "Currently, the supported cryptocurrencies are:\n\n"
+                    "{supported_tickers}\n\n"
+                    "{footer}")
+
+    reddit.redditor(str(comment.author)).message(message_subject, message_body.format(
+        author=str(comment.author),
+        permalink=str(comment.permalink),
+        sorry_link="https://media.giphy.com/media/sS8YbjrTzu4KI/giphy.gif",
+        ticker = ticker,
+        supported_tickers = ", ".join(supported_tickers),
+        footer = get_message_footer()
+    ))
+
+def send_message_generic_error(comment):
+    """
+    PMs the user with a generic error
+    """
+    message_subject = "cryptoRemindMe Error"
+    message_body = ("Hello {author},\n\n"
+                   "[Sorry]({sorry_link}) but there was an unknown error processing [your request]({permalink})\n\n"
+                   "Please try again later.\n\n"
+                    "{footer}")
+
+    reddit.redditor(str(comment.author)).message(message_subject, message_body.format(
+        author = str(comment.author),
+        permalink = str(comment.permalink),
+        sorry_link = "https://media.giphy.com/media/sS8YbjrTzu4KI/giphy.gif",
+        footer = get_message_footer()
+    ))
+
 def grab_list_of_reminders(username):
     """
     Grabs all the reminders of the user
@@ -306,7 +392,7 @@ def grab_list_of_reminders(username):
         table = "Looks like you have no reminders. Click the **[Custom]** button below to make one!"
     elif len(table) > 9000:
         table = "Sorry the comment was too long to display. Message /u/RemindMeBotWrangler as this was his lazy error catching."
-    table += Search.endMessage
+    table += get_message_footer()
     return table
 
 def remove_reminder(username, idnum):
@@ -355,7 +441,7 @@ def read_pm():
                 "!cryptoremindme" in message.body.lower()) and prawobject):
                 redditPM = Search(message)
                 redditPM.run(privateMessage=True)
-                message.mark_as_read()
+                message.mark_read()
             elif (("delete!" in message.body.lower() or "!delete" in message.body.lower()) and prawobject):  
                 givenid = re.findall(r'delete!\s(.*?)$', message.body.lower())[0]
                 givenid = 't1_'+givenid
@@ -450,6 +536,7 @@ def main():
     checkcycle = 0
     last_processed_time = get_last_run_time()
     while True:
+        print("Start Main Loop")
         try:
             update_crypto_prices()
             # grab the request
@@ -478,7 +565,7 @@ def main():
             lastrun_file.write(str(last_processed_time))
             lastrun_file.close()
 
-            print("----")
+            print("End Main Loop")
             time.sleep(30)
         except Exception as err:
             print(traceback.format_exc())

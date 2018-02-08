@@ -31,7 +31,7 @@ client_secret = config.get("Reddit", "client_secret")
 reddit = praw.Reddit(client_id=client_id,
                      client_secret=client_secret,
                      password=bot_password,
-                     user_agent='cryptoRemindMe by /u/boyAndHisBlob',
+                     user_agent='cryptoRemindMe by /u/BoyAndHisBlob',
                      username=bot_username)
 # DB Info
 DB_USER = config.get("SQL", "user")
@@ -71,7 +71,7 @@ class Reply(object):
             "\n\n_____\n\n"
             "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
             "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
-            "|[^(Feedback)](http://np.reddit.com/message/compose/?to=boyAndHisBlob&subject=cryptoRemindMe Feedback)"
+            "|[^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=cryptoRemindMe Feedback)"
             "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
             "\n|-|-|-|-|-|-|"
             )
@@ -219,8 +219,8 @@ class Reply(object):
                     send_reply = False
 
                 if send_reply:
-                    # MySQl- object_name, message, create date, reddit user, new_price, origin_price, permalink, ticker, message_price_time, message_price
-                    delete_message = self._send_reply(object_name, row[2], str(row[6]), row[5], new_price, origin_price, row[8], ticker, message_price_time, message_price)
+                    # MySQl- object_name, message, comment_create_datetime, reddit user, new_price, origin_price, permalink, ticker, message_price_time, message_price
+                    delete_message = self._send_reply(object_name, row[2], comment_create_datetime, row[5], new_price, origin_price, row[8], ticker, message_price_time, message_price)
                     if delete_message:
                         cmd = "DELETE FROM reminder WHERE id = %s"
                         self._db_connection.cursor.execute(cmd, [row[0]])
@@ -230,7 +230,7 @@ class Reply(object):
         self._db_connection.connection.commit()
         self._db_connection.connection.close()
 
-    def _send_reply(self, object_name, message, create_date, author, new_price, origin_price, permalink, ticker, message_price_time, message_price):
+    def _send_reply(self, object_name, message, comment_create_datetime, author, new_price, origin_price, permalink, ticker, message_price_time, message_price):
         """
         Replies a second time to the user after a set amount of time
         """
@@ -238,9 +238,10 @@ class Reply(object):
         print(author)
         print(object_name)
 
+        utc_create_date_str = str(datetime.utcfromtimestamp(comment_create_datetime.timestamp()))
         origin_date_text =  ("\n\nYou requested this reminder on: " 
-                            "[" + create_date + " UTC](http://www.wolframalpha.com/input/?i="
-                             + create_date + " UTC To Local Time)")
+                            "[" + utc_create_date_str + " UTC](http://www.wolframalpha.com/input/?i="
+                             + utc_create_date_str + " UTC To Local Time)")
 
         message_price_datetime = datetime.utcfromtimestamp(message_price_time)
         message_price_datetime_formatted = ("[" + format(message_price_datetime, '%Y-%m-%d %H:%M:%S') + " UTC](http://www.wolframalpha.com/input/?i="
