@@ -248,14 +248,14 @@ class Reply(object):
                              + format(message_price_datetime, '%Y-%m-%d %H:%M:%S') + " UTC To Local Time)")
 
         try:
-            reddit.redditor(str(author)).message('Hello, ' + str(author) + ' cryptoRemindMeBot Here!', self._replyMessage.format(
+            reddit.redditor(str(author)).message('cryptoRemindMeBot Reminder!', self._replyMessage.format(
                     message=message,
                     original=permalink,
                     parent= self._parent_comment(object_name),
                     origin_date_text = origin_date_text,
-                    new_price = '${:,.2f}'.format(new_price),
-                    origin_price = '${:,.2f}'.format(origin_price),
-                    price = '${:,.2f}'.format(message_price),
+                    new_price = '${:,.4f}'.format(new_price),
+                    origin_price = '${:,.4f}'.format(origin_price),
+                    price = '${:,.4f}'.format(message_price),
                     price_time = message_price_datetime_formatted,
                     ticker = ticker
                 ))
