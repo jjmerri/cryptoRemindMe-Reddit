@@ -67,18 +67,6 @@ class DbConnection(object):
         self.cursor = self.connection.cursor()
 
 class Search(object):
-    commented = [] # comments already replied to
-    subId = [] # reddit threads already replied in
-    
-    # Fills subId with previous threads. Helpful for restarts
-    database = DbConnection()
-    cmd = "SELECT list FROM comment_list WHERE id = 1"
-    database.cursor.execute(cmd)
-    data = database.cursor.fetchall()
-    subId = ast.literal_eval("[" + data[0][0] + "]")
-    database.connection.commit()
-    database.connection.close()
-
     def __init__(self, comment):
         self._db_connection = DbConnection()
         self.comment = comment # Reddit comment Object
@@ -141,8 +129,8 @@ class Search(object):
                 self.comment.permalink = comment.permalink
             else:
                 # Defaults when the user doesn't provide a link
-                self.comment.target_id = "24duzp"
-                self.comment.permalink = "http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/"
+                self.comment.target_id = "du0cwqr"
+                self.comment.permalink = "http://np.reddit.com/r/testingground4bots/comments/7whejk/crypto_remind_me_default/du0cwqr/"
         else:
             self.comment.target_id = self.comment.id
         # remove cryptoRemindMe! or !cryptoRemindMe (case insenstive)
@@ -177,8 +165,6 @@ class Search(object):
                         self._ticker.encode('utf-8'),
                         self._origin_date))
         self._db_connection.connection.commit()
-        # Info is added to DB, user won't be bothered a second time
-        self.commented.append(self.comment.id)
 
     def _build_message(self, is_for_comment = True):
         """
@@ -190,11 +176,7 @@ class Search(object):
             " to remind you of [**this link.**]({commentPermalink})"
             "{remindMeMessage}")
 
-        try:
-            self.sub = reddit.comment(self.comment.id)
-        except Exception as err:
-            print(err)
-        if self._privateMessage is False and is_for_comment and self.sub.id not in self.subId:
+        if self._privateMessage is False and is_for_comment:
             remindMeMessage = (
                 "\n\n[**CLICK THIS LINK**](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=Reminder&message="
                 "[{id}]%0A%0AcryptoRemindMe! {ticker} ${price}) to send a PM to also be reminded and to reduce spam."
@@ -227,26 +209,11 @@ class Search(object):
 
         try:
             if self._privateMessage == False:
-                # First message will be a reply in a thread
-                # afterwards are PM in the same thread
-                if (self.sub.id not in self.subId):
-                    self.subId.append(self.sub.id)
-                    # adding it to database as well
-                    database = DbConnection()
-                    insertsubid = ", \'" + self.sub.id + "\'"
-                    cmd = 'UPDATE comment_list set list = CONCAT(list, "{0}") where id = 1'.format(insertsubid)
-                    database.cursor.execute(cmd)
-                    database.connection.commit()
-                    database.connection.close()
-
-                    newcomment = self.comment.reply(self._reply_message)
-                    # grabbing comment just made
-                    reddit.comment((newcomment.id)
-                        ).edit(self._reply_message.replace('____id____', str(newcomment.id)))
-                else:
-                    send_message()
+                newcomment = self.comment.reply(self._reply_message)
+                # grabbing comment just made
+                reddit.comment((newcomment.id)
+                    ).edit(self._reply_message.replace('____id____', str(newcomment.id)))
             else:
-                print(str(author))
                 send_message()
         except APIException as err: # Catch any less specific API errors
             print(err)
@@ -255,9 +222,7 @@ class Search(object):
 
         except PRAWException as err:
             print(err)
-            # PM when I message too much
             send_message()
-            time.sleep(10)
 
     def _find_bot_child_comment(self):
         """
@@ -321,7 +286,7 @@ def is_valid_comment_id(comment_id):
 def get_message_footer():
     return (
         "\n\n_____\n\n"
-        "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
+        "|[^(README)](https://github.com/jjmerri/cryptoRemindMe-Reddit/blob/master/README.md)"
         "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
         "|[^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=Feedback)"
         "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
@@ -484,6 +449,11 @@ def read_pm():
                 listOfReminders = grab_list_of_reminders(message.author.name)
                 message.reply("I have deleted all **" + count + "** reminders for you.\n\n" + listOfReminders)
                 message.mark_read()
+            else: #unknown pm
+                message.mark_read()
+                reddit.redditor(str("BoyAndHisBlob")).message('cryptoRemindMe Unknown PM FWD',
+                                "From: " + (message.author.name if message.author is not None else message.subreddit_name_prefixed) + "\n\n"
+                                "Subject: " + message.subject + "\n\n" + message.body)
     except Exception as err:
         print(traceback.format_exc())
 
@@ -494,7 +464,6 @@ def check_comment(comment):
     reddit_call = Search(comment)
     if (("cryptoremindme!" in comment.body.lower() or
         "!cryptoremindme" in comment.body.lower()) and
-        reddit_call.comment.id not in reddit_call.commented and
         'cryptoRemindMeBot' != str(comment.author) and
         'cryptoRemindMeBotTst' != str(comment.author)):
             print("Running Thread")
@@ -569,7 +538,7 @@ def main():
                 comment = praw.models.Comment(reddit, id = rawcomment["id"])
                 check_comment(comment)
 
-            # Only check periodically 
+            # Only check periodically
             if checkcycle >= 5:
                 check_own_comments()
                 checkcycle = 0
@@ -581,10 +550,10 @@ def main():
             lastrun_file.close()
 
             print("End Main Loop")
-            time.sleep(30)
         except Exception as err:
             print(traceback.format_exc())
-            time.sleep(30)
+
+        time.sleep(30)
 # =============================================================================
 # RUNNER
 # =============================================================================

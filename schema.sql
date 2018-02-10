@@ -2,12 +2,6 @@ DROP SCHEMA IF EXISTS crypto_remind_me;
 CREATE SCHEMA crypto_remind_me;
 USE crypto_remind_me;
 
-CREATE TABLE `comment_list` (
-  `list` longtext,
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 ;
-
 CREATE TABLE `reminder` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `object_name` varchar(400) NOT NULL,
@@ -22,5 +16,3 @@ CREATE TABLE `reminder` (
   `comment_create_datetime` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
-INSERT INTO comment_list (list) VALUES ('''''');

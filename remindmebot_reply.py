@@ -69,7 +69,7 @@ class Reply(object):
             "\n\nYou requested a reminder when the price of {ticker} reached {new_price} from {origin_price}."
             "\n\nThe price hit {price} at {price_time} using CryptoCompare's Current Aggregate."
             "\n\n_____\n\n"
-            "|[^(FAQs)](http://np.reddit.com/r/RemindMeBot/comments/24duzp/remindmebot_info/)"
+            "|[^(README)](https://github.com/jjmerri/cryptoRemindMe-Reddit/blob/master/README.md)"
             "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
             "|[^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=cryptoRemindMe Feedback)"
             "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
