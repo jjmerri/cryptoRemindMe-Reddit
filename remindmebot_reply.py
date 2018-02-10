@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3.6
 
 # =============================================================================
 # IMPORTS
@@ -202,7 +202,8 @@ class Reply(object):
                             elif new_price >= price_low and new_price <= origin_price:
                                 message_price = price_low
                             else:
-                                print("This is how the world ends")
+                                # This is not the minute_data that triggered the reply
+                                continue
 
                             message_price_time = price_time
                             send_reply = True
