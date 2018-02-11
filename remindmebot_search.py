@@ -8,7 +8,7 @@ import praw
 import re
 import MySQLdb
 import configparser
-import ast
+import logging
 import time
 import os
 import requests
@@ -40,10 +40,16 @@ reddit = praw.Reddit(client_id=client_id,
 DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
 
+FORMAT = '%(asctime)-15s %(message)s'
+logging.basicConfig(format=FORMAT)
+logger = logging.getLogger('cryptoRemindMeBot')
+logger.setLevel(logging.INFO)
+
 #Dictionary to store current crypto prices
 current_price = {"XRP": 0.0}
 
-supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","ETC","ETH","LSK","LTC","MIOTA","NEO","QTUM","STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
+supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","STEEM",
+                     "XEM","XLM","XMR","XRB","XRP","ZEC"]
 
 # =============================================================================
 # CLASSES
@@ -85,7 +91,8 @@ class Search(object):
         try:
             parsed_command = self._parse_comment()
         except Exception as err:
-            print(err)
+            logger.error(err)
+            logger.error("Unknown Exception in run while parsing comment")
             parsed_command = None
 
         if parsed_command == ParseMessage.SUCCESS:
@@ -94,7 +101,8 @@ class Search(object):
                 self._build_message()
                 self._reply()
             except Exception as err:
-                print(err)
+                logger.error(err)
+                logger.error("Unknown Exception in run after parsed command")
                 send_message_generic_error(self.comment)
         elif parsed_command == ParseMessage.SYNTAX_ERROR:
             send_message_syntax(self.comment)
@@ -216,13 +224,18 @@ class Search(object):
             else:
                 send_message()
         except APIException as err: # Catch any less specific API errors
-            print(err)
+            logger.error(err)
+            logger.error("APIException in _reply")
             if err.error_type == "RATELIMIT":
                 send_message()
 
         except PRAWException as err:
-            print(err)
+            logger.error(err)
+            logger.error("PRAWException in _reply")
             send_message()
+        except Exception as err:
+            logger.error(err)
+            logger.error("Unknown Exception in _reply")
 
     def _find_bot_child_comment(self):
         """
@@ -238,7 +251,8 @@ class Search(object):
                         self.comment_count(comment)
                         break;
         except Exception as err:
-            print(err)
+            logger.error(err)
+            logger.error("Unknown Exception in _find_bot_child_comment")
             
     def comment_count(self, found_comment):
         """
@@ -275,14 +289,20 @@ def is_valid_comment_id(comment_id):
         reddit.comment(comment_id).submission
         is_valid = True
     except PRAWException as err:
-        print("Not a valid ID")
+        logger.error(err)
+        logger.error("Not a valid ID")
         is_valid = False
     except Exception as err:
-        print(err)
+        logger.error(err)
+        logger.error("Unknown Exception in is_valid_comment_id")
         is_valid = False
 
     return is_valid
 
+def get_disclaimer():
+    return ("^^^^.\n\n"
+           "^^^^**DISCLAIMER:** ^^^^The ^^^^developer ^^^^that ^^^^maintains ^^^^this ^^^^bot ^^^^does ^^^^not ^^^^guarantee ^^^^the ^^^^accuracy ^^^^of ^^^^the ^^^^data ^^^^it ^^^^provides ^^^^nor ^^^^does ^^^^he ^^^^gurantee ^^^^the ^^^^reliability ^^^^of ^^^^its ^^^^notification ^^^^system. ^^^^Do ^^^^not ^^^^rely ^^^^on ^^^^this ^^^^bot ^^^^for ^^^^information ^^^^that ^^^^will ^^^^affect ^^^^your ^^^^financial ^^^^decisions. ^^^^Double ^^^^check ^^^^all ^^^^prices ^^^^before ^^^^acting ^^^^on ^^^^any ^^^^information ^^^^provided ^^^^by ^^^^this ^^^^bot. ^^^^Do ^^^^not ^^^^rely ^^^^solely ^^^^on ^^^^this ^^^^bot ^^^^to ^^^^notify ^^^^you ^^^^of ^^^^price ^^^^updates ^^^^as ^^^^it ^^^^doesn't ^^^^have ^^^^failsafes ^^^^in ^^^^place ^^^^to ^^^^be ^^^^100% ^^^^reliable."
+            )
 def get_message_footer():
     return (
         "\n\n_____\n\n"
@@ -290,7 +310,7 @@ def get_message_footer():
         "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
         "|[^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=Feedback)"
         "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
-        "\n|-|-|-|-|-|-|"
+        "\n|-|-|-|-|-|-|\n\n" + get_disclaimer()
     )
 def send_message_syntax(comment):
     """
@@ -410,11 +430,11 @@ def read_pm():
             prawobject = isinstance(message, praw.models.Message)
             if (("cryptoremindme" in message.body.lower() or
                 "cryptoremindme!" in message.body.lower() or
-                "!cryptoremindme" in message.body.lower()) and prawobject):
+                "!cryptoremindme" in message.body.lower()) and prawobject and not message.was_comment):
                 redditPM = Search(message)
                 redditPM.run(privateMessage=True)
                 message.mark_read()
-            elif (("delete!" in message.body.lower() or "!delete" in message.body.lower()) and prawobject):
+            elif (("delete!" in message.body.lower() or "!delete" in message.body.lower()) and prawobject and not message.was_comment):
                 try:
                     givenid = re.findall(r'delete!\s(.*?)$', message.body.lower())[0]
                     comment = reddit.comment(givenid)
@@ -423,18 +443,22 @@ def read_pm():
                         comment.delete()
                 except ValueError as err:
                     # comment wasn't inside the list
-                    pass
+                    logger.error(err)
+                    logger.error("ValueError in read_pm in delete!")
                 except AttributeError as err:
                     # comment might be deleted already
-                    pass
+                    logger.error(err)
+                    logger.error("AttributeError in read_pm in delete!")
                 except Exception as err:
-                    print(err)
+                    logger.error(err)
+                    logger.error("Unknown Exception in read_pm in delete!")
+
                 message.mark_read()
-            elif (("myreminders!" in message.body.lower() or "!myreminders" in message.body.lower()) and prawobject):
+            elif (("myreminders!" in message.body.lower() or "!myreminders" in message.body.lower()) and prawobject and not message.was_comment):
                 reminders_reply = grab_list_of_reminders(message.author.name)
                 message.reply(reminders_reply)
                 message.mark_read()
-            elif (("remove!" in message.body.lower() or "!remove" in message.body.lower()) and prawobject):
+            elif (("remove!" in message.body.lower() or "!remove" in message.body.lower()) and prawobject and not message.was_comment):
                 givenid = re.findall(r'remove!\s(.*?)$', message.body.lower())[0]
                 deletedFlag = remove_reminder(message.author.name, givenid)
                 listOfReminders = grab_list_of_reminders(message.author.name)
@@ -444,18 +468,27 @@ def read_pm():
                 else:
                     message.reply("Try again with the current IDs that belong to you below. Your current Reminders:\n\n" + listOfReminders)
                 message.mark_read()
-            elif (("removeall!" in message.body.lower() or "!removeall" in message.body.lower()) and prawobject):
+            elif (("removeall!" in message.body.lower() or "!removeall" in message.body.lower()) and prawobject and not message.was_comment):
                 count = str(remove_all(message.author.name))
                 listOfReminders = grab_list_of_reminders(message.author.name)
                 message.reply("I have deleted all **" + count + "** reminders for you.\n\n" + listOfReminders)
                 message.mark_read()
             else: #unknown pm
+                #mark_read first in case unexpected error
                 message.mark_read()
+                permalink = None
+                if message.was_comment:
+                    permalink = reddit.comment(message.id).parent().permalink
+
                 reddit.redditor(str("BoyAndHisBlob")).message('cryptoRemindMe Unknown PM FWD',
-                                "From: " + (message.author.name if message.author is not None else message.subreddit_name_prefixed) + "\n\n"
-                                "Subject: " + message.subject + "\n\n" + message.body)
+                                "From: " + (message.author.name if message.author is not None else message.subreddit_name_prefixed) + "\n\n" +
+                                "Subject: " + message.subject + "\n\n" +
+                                "Parent Permalink: " + (permalink if permalink is not None else "NONE") + "\n\n" +
+                                message.body)
     except Exception as err:
-        print(traceback.format_exc())
+        logger.error(traceback.format_exc())
+        logger.error(err)
+        logger.error("Unknown Exception in read_pm")
 
 def check_comment(comment):
     """
@@ -466,16 +499,16 @@ def check_comment(comment):
         "!cryptoremindme" in comment.body.lower()) and
         'cryptoRemindMeBot' != str(comment.author) and
         'cryptoRemindMeBotTst' != str(comment.author)):
-            print("Running Thread")
+            logger.info("Running Thread")
             t = Thread(target=reddit_call.run())
             t.start()
 
 def check_own_comments():
     for comment in reddit.redditor('cryptoRemindMeBot').comments.new(limit=None):
         if comment.score <= -5:
-            print(comment)
+            logger.info(comment)
             comment.delete()
-            print("COMMENT DELETED")
+            logger.info("COMMENT DELETED")
 
 def update_crypto_prices():
     """
@@ -515,12 +548,12 @@ def create_lastrun():
 # =============================================================================
 
 def main():
-    print("start")
+    logger.info("start")
     create_lastrun()
     checkcycle = 0
     last_processed_time = get_last_run_time()
     while True:
-        print("Start Main Loop")
+        logger.info("Start Main Loop")
         try:
             update_crypto_prices()
             # grab the request
@@ -549,9 +582,11 @@ def main():
             lastrun_file.write(str(last_processed_time))
             lastrun_file.close()
 
-            print("End Main Loop")
+            logger.info("End Main Loop")
         except Exception as err:
-            print(traceback.format_exc())
+            logger.error(err)
+            logger.error(traceback.format_exc())
+            logger.error("Unknown Exception in Main Loop")
 
         time.sleep(30)
 # =============================================================================

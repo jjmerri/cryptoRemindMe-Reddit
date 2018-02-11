@@ -9,6 +9,7 @@ import MySQLdb
 import configparser
 import time
 import requests
+import logging
 from datetime import datetime
 from requests.exceptions import HTTPError, ConnectionError, Timeout
 from praw.exceptions import APIException, ClientException, PRAWException
@@ -37,7 +38,13 @@ reddit = praw.Reddit(client_id=client_id,
 DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
 
-supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","ETC","ETH","LSK","LTC","NEO","QTUM","STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
+FORMAT = '%(asctime)-15s %(message)s'
+logging.basicConfig(format=FORMAT)
+logger = logging.getLogger('cryptoRemindMeBot')
+logger.setLevel(logging.INFO)
+
+supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","STEEM",
+                     "XEM","XLM","XMR","XRB","XRP","ZEC"]
 
 # =============================================================================
 # CLASSES
@@ -73,7 +80,8 @@ class Reply(object):
             "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
             "|[^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=cryptoRemindMe Feedback)"
             "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
-            "\n|-|-|-|-|-|-|"
+            "\n|-|-|-|-|-|-|\n\n" +
+            "^^^^.\n\n^^^^**DISCLAIMER:** ^^^^The ^^^^developer ^^^^that ^^^^maintains ^^^^this ^^^^bot ^^^^does ^^^^not ^^^^guarantee ^^^^the ^^^^accuracy ^^^^of ^^^^the ^^^^data ^^^^it ^^^^provides ^^^^nor ^^^^does ^^^^he ^^^^gurantee ^^^^the ^^^^reliability ^^^^of ^^^^its ^^^^notification ^^^^system. ^^^^Do ^^^^not ^^^^rely ^^^^on ^^^^this ^^^^bot ^^^^for ^^^^information ^^^^that ^^^^will ^^^^affect ^^^^your ^^^^financial ^^^^decisions. ^^^^Double ^^^^check ^^^^all ^^^^prices ^^^^before ^^^^acting ^^^^on ^^^^any ^^^^information ^^^^provided ^^^^by ^^^^this ^^^^bot. ^^^^Do ^^^^not ^^^^rely ^^^^solely ^^^^on ^^^^this ^^^^bot ^^^^to ^^^^notify ^^^^you ^^^^of ^^^^price ^^^^updates ^^^^as ^^^^it ^^^^doesn't ^^^^have ^^^^failsafes ^^^^in ^^^^place ^^^^to ^^^^be ^^^^100% ^^^^reliable."
             )
         self.last_price_time = {}
         self._price_history = {}
@@ -137,12 +145,12 @@ class Reply(object):
             else:
                 return comment.parent().permalink
         except IndexError as err:
-            print("parrent_comment error")
+            logger.error("parrent_comment error")
             return "It seems your original comment was deleted, unable to return parent comment."
         # Catch any URLs that are not reddit comments
         except Exception  as err:
-            print(err)
-            print("HTTPError/PRAW parent comment")
+            logger.error(err)
+            logger.error("HTTPError/PRAW parent comment")
             return "Parent comment not required for this URL."
 
     def populate_reply_list(self):
@@ -210,13 +218,13 @@ class Reply(object):
                             break
 
                 except IndexError as err:
-                    print(err)
-                    print("IndexError in send_replies")
+                    logger.error(err)
+                    logger.error("IndexError in send_replies")
                     send_reply = False
                 # Catch any URLs that are not reddit comments
                 except Exception  as err:
-                    print(err)
-                    print("HTTPError/PRAW send_replies")
+                    logger.error(err)
+                    logger.error("Unknown Exception send_replies")
                     send_reply = False
 
                 if send_reply:
@@ -235,9 +243,9 @@ class Reply(object):
         """
         Replies a second time to the user after a set amount of time
         """
-        print("---------------")
-        print(author)
-        print(object_name)
+        logger.info("---------------")
+        logger.info(author)
+        logger.info(object_name)
 
         utc_create_date_str = str(datetime.utcfromtimestamp(comment_create_datetime.timestamp()))
         origin_date_text =  ("\n\nYou requested this reminder on: " 
@@ -260,25 +268,34 @@ class Reply(object):
                     price_time = message_price_datetime_formatted,
                     ticker = ticker
                 ))
-            print("Sent Reply")
+            logger.info("Sent Reply")
             return True
         except APIException as err:
-            print("APIException", err)
+            logger.error(err)
+            logger.error("APIException in _send_reply")
             return False
         except IndexError as err:
-            print("IndexError", err)
+            logger.error(err)
+            logger.error("IndexError in _send_reply")
             return False
         except (HTTPError, ConnectionError, Timeout, timeout) as err:
-            print("HTTPError", err)
+            logger.error(err)
+            logger.error("HTTPError in _send_reply")
             time.sleep(10)
             return False
         except ClientException as err:
-            print("ClientException", err)
+            logger.error(err)
+            logger.error("ClientException in _send_reply")
             time.sleep(10)
             return False
         except PRAWException as err:
-            print("PRAWException", err)
+            logger.error(err)
+            logger.error("PRAWException in _send_reply")
             time.sleep(10)
+            return False
+        except Exception as err:
+            logger.error(err)
+            logger.error("Unknown Exception in _send_reply")
             return False
 
 def update_last_run(checkReply):
@@ -301,7 +318,7 @@ def update_last_run(checkReply):
 
 def main():
     while True:
-        print("Start Main Loop")
+        logger.info("Start Main Loop")
         checkReply = Reply()
         checkReply.set_price_extremes()
         checkReply.populate_reply_list()
@@ -309,13 +326,13 @@ def main():
 
         update_last_run(checkReply)
 
-        print("End Main Loop")
+        logger.info("End Main Loop")
         time.sleep(600)
 
 
 # =============================================================================
 # RUNNER
 # =============================================================================
-print("start")
+logger.info("start")
 if __name__ == '__main__':
     main()
