@@ -6,6 +6,8 @@
 
 import praw
 import MySQLdb
+import os
+import sys
 import configparser
 import time
 import requests
@@ -312,12 +314,27 @@ def update_last_run(checkReply):
     lastrun_file.write(lastrun_tickers)
     lastrun_file.close()
 
+def create_running():
+    running_file = open("reply_bot.running", "w")
+    running_file.write(str(os.getpid()))
+    running_file.close()
+
 # =============================================================================
 # MAIN
 # =============================================================================
 
 def main():
-    while True:
+    logger.info("start")
+    start_process = False
+
+    if not os.path.isfile("reply_bot.running"):
+        create_running()
+        start_process = True
+    else:
+        start_process = False
+        logger.error("Reply already running! Will not start.")
+
+    while start_process and os.path.isfile("reply_bot.running"):
         logger.info("Start Main Loop")
         checkReply = Reply()
         checkReply.set_price_extremes()
@@ -329,10 +346,10 @@ def main():
         logger.info("End Main Loop")
         time.sleep(600)
 
+    sys.exit()
 
 # =============================================================================
 # RUNNER
 # =============================================================================
-logger.info("start")
 if __name__ == '__main__':
     main()

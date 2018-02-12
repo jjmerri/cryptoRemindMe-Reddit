@@ -219,3 +219,4 @@ remindmebot.cfg
 lastrun.txt
 lastrunsearch.txt
 remindmebotDroplet.cfg
+*.running

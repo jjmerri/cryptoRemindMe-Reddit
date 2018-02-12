@@ -11,6 +11,7 @@ import configparser
 import logging
 import time
 import os
+import sys
 import requests
 from datetime import datetime
 from praw.exceptions import APIException, PRAWException
@@ -542,17 +543,31 @@ def create_lastrun():
         lastrun_file.write("0")
         lastrun_file.close()
 
+def create_running():
+    running_file = open("search_bot.running", "w")
+    running_file.write(str(os.getpid()))
+    running_file.close()
+
 
 # =============================================================================
 # MAIN
 # =============================================================================
 
 def main():
+    checkcycle = 0
+    start_process = False
     logger.info("start")
     create_lastrun()
-    checkcycle = 0
+
+    if not os.path.isfile("search_bot.running"):
+        create_running()
+        start_process = True
+    else:
+        start_process = False
+        logger.error("Search already running! Will not start.")
+
     last_processed_time = get_last_run_time()
-    while True:
+    while start_process and os.path.isfile("search_bot.running"):
         logger.info("Start Main Loop")
         try:
             update_crypto_prices()
@@ -589,6 +604,8 @@ def main():
             logger.error("Unknown Exception in Main Loop")
 
         time.sleep(30)
+
+    sys.exit()
 # =============================================================================
 # RUNNER
 # =============================================================================
