@@ -40,13 +40,15 @@ reddit = praw.Reddit(client_id=client_id,
 DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
 
+ENVIRONMENT = config.get("REMINDME", "environment")
+
 FORMAT = '%(asctime)-15s %(message)s'
 logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('cryptoRemindMeBot')
 logger.setLevel(logging.INFO)
 
-supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","STEEM",
-                     "XEM","XLM","XMR","XRB","XRP","ZEC"]
+supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","REQ",
+                     "STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
 
 # =============================================================================
 # CLASSES
@@ -326,6 +328,10 @@ def create_running():
 def main():
     logger.info("start")
     start_process = False
+
+    if ENVIRONMENT == "DEV":
+        os.remove("reply_bot.running")
+        logger.info("running file removed")
 
     if not os.path.isfile("reply_bot.running"):
         create_running()

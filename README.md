@@ -6,7 +6,7 @@ cryptoRemindMeBot was made as a way to remind the user about a comment or thread
 
 #### Supported Cryptocurrency Tickers
 
-["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
+["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","REQ","STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
 
 #### Commands
 ##### cryptoRemindMe! {ticker} {price} {optional_message}

@@ -41,6 +41,10 @@ reddit = praw.Reddit(client_id=client_id,
 DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
 
+ENVIRONMENT = config.get("REMINDME", "environment")
+
+DEV_USER_NAME = "BoyAndHisBlob"
+
 FORMAT = '%(asctime)-15s %(message)s'
 logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('cryptoRemindMeBot')
@@ -49,8 +53,8 @@ logger.setLevel(logging.INFO)
 #Dictionary to store current crypto prices
 current_price = {"XRP": 0.0}
 
-supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","STEEM",
-                     "XEM","XLM","XMR","XRB","XRP","ZEC"]
+supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","REQ",
+                     "STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
 
 # =============================================================================
 # CLASSES
@@ -309,7 +313,7 @@ def get_message_footer():
         "\n\n_____\n\n"
         "|[^(README)](https://github.com/jjmerri/cryptoRemindMe-Reddit/blob/master/README.md)"
         "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
-        "|[^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=Feedback)"
+        "|[^(Feedback)](http://np.reddit.com/message/compose/?to=" + DEV_USER_NAME + "&subject=cryptoRemindMe Feedback)"
         "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
         "\n|-|-|-|-|-|-|\n\n" + get_disclaimer()
     )
@@ -431,11 +435,14 @@ def read_pm():
             prawobject = isinstance(message, praw.models.Message)
             if (("cryptoremindme" in message.body.lower() or
                 "cryptoremindme!" in message.body.lower() or
-                "!cryptoremindme" in message.body.lower()) and prawobject and not message.was_comment):
+                "!cryptoremindme" in message.body.lower()) and prawobject and not message.was_comment and
+                message.author is not None and message.author.name != "AutoModerator" and
+                (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
                 redditPM = Search(message)
                 redditPM.run(privateMessage=True)
                 message.mark_read()
-            elif (("delete!" in message.body.lower() or "!delete" in message.body.lower()) and prawobject and not message.was_comment):
+            elif (("delete!" in message.body.lower() or "!delete" in message.body.lower()) and prawobject and not message.was_comment and
+                 (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
                 try:
                     givenid = re.findall(r'delete!\s(.*?)$', message.body.lower())[0]
                     comment = reddit.comment(givenid)
@@ -455,11 +462,13 @@ def read_pm():
                     logger.error("Unknown Exception in read_pm in delete!")
 
                 message.mark_read()
-            elif (("myreminders!" in message.body.lower() or "!myreminders" in message.body.lower()) and prawobject and not message.was_comment):
+            elif (("myreminders!" in message.body.lower() or "!myreminders" in message.body.lower()) and prawobject and not message.was_comment and
+                 (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
                 reminders_reply = grab_list_of_reminders(message.author.name)
                 message.reply(reminders_reply)
                 message.mark_read()
-            elif (("remove!" in message.body.lower() or "!remove" in message.body.lower()) and prawobject and not message.was_comment):
+            elif (("remove!" in message.body.lower() or "!remove" in message.body.lower()) and prawobject and not message.was_comment and
+                 (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
                 givenid = re.findall(r'remove!\s(.*?)$', message.body.lower())[0]
                 deletedFlag = remove_reminder(message.author.name, givenid)
                 listOfReminders = grab_list_of_reminders(message.author.name)
@@ -469,19 +478,20 @@ def read_pm():
                 else:
                     message.reply("Try again with the current IDs that belong to you below. Your current Reminders:\n\n" + listOfReminders)
                 message.mark_read()
-            elif (("removeall!" in message.body.lower() or "!removeall" in message.body.lower()) and prawobject and not message.was_comment):
+            elif (("removeall!" in message.body.lower() or "!removeall" in message.body.lower()) and prawobject and not message.was_comment and
+                (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
                 count = str(remove_all(message.author.name))
                 listOfReminders = grab_list_of_reminders(message.author.name)
                 message.reply("I have deleted all **" + count + "** reminders for you.\n\n" + listOfReminders)
                 message.mark_read()
-            else: #unknown pm
+            elif ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME): #unknown pm
                 #mark_read first in case unexpected error
                 message.mark_read()
                 permalink = None
                 if message.was_comment:
                     permalink = reddit.comment(message.id).parent().permalink
 
-                reddit.redditor(str("BoyAndHisBlob")).message('cryptoRemindMe Unknown PM FWD',
+                reddit.redditor(DEV_USER_NAME).message('cryptoRemindMe Unknown PM FWD',
                                 "From: " + (message.author.name if message.author is not None else message.subreddit_name_prefixed) + "\n\n" +
                                 "Subject: " + message.subject + "\n\n" +
                                 "Parent Permalink: " + (permalink if permalink is not None else "NONE") + "\n\n" +
@@ -559,6 +569,10 @@ def main():
     logger.info("start")
     create_lastrun()
 
+    if ENVIRONMENT == "DEV":
+        os.remove("search_bot.running")
+        logger.info("running file removed")
+
     if not os.path.isfile("search_bot.running"):
         create_running()
         start_process = True
@@ -584,7 +598,10 @@ def main():
                 # object constructor requires empty attribute
                 rawcomment['_replies'] = ''
                 comment = praw.models.Comment(reddit, id = rawcomment["id"])
-                check_comment(comment)
+
+                #Only process my own comments in dev
+                if ENVIRONMENT != "DEV" or rawcomment["author"] == DEV_USER_NAME:
+                    check_comment(comment)
 
             # Only check periodically
             if checkcycle >= 5:
