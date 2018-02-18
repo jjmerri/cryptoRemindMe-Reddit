@@ -433,69 +433,78 @@ def read_pm():
         for message in reddit.inbox.unread(limit = 100):
             # checks to see as some comments might be replys and non PMs
             prawobject = isinstance(message, praw.models.Message)
-            if (("cryptoremindme" in message.body.lower() or
-                "cryptoremindme!" in message.body.lower() or
-                "!cryptoremindme" in message.body.lower()) and prawobject and not message.was_comment and
-                message.author is not None and message.author.name != "AutoModerator" and
-                (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
-                redditPM = Search(message)
-                redditPM.run(privateMessage=True)
-                message.mark_read()
-            elif (("delete!" in message.body.lower() or "!delete" in message.body.lower()) and prawobject and not message.was_comment and
-                 (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
-                try:
-                    givenid = re.findall(r'delete!\s(.*?)$', message.body.lower())[0]
-                    comment = reddit.comment(givenid)
-                    parentcomment = comment.parent()
-                    if message.author.name == parentcomment.author.name:
-                        comment.delete()
-                except ValueError as err:
-                    # comment wasn't inside the list
-                    logger.error(err)
-                    logger.error("ValueError in read_pm in delete!")
-                except AttributeError as err:
-                    # comment might be deleted already
-                    logger.error(err)
-                    logger.error("AttributeError in read_pm in delete!")
-                except Exception as err:
-                    logger.error(err)
-                    logger.error("Unknown Exception in read_pm in delete!")
 
-                message.mark_read()
-            elif (("myreminders!" in message.body.lower() or "!myreminders" in message.body.lower()) and prawobject and not message.was_comment and
-                 (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
-                reminders_reply = grab_list_of_reminders(message.author.name)
-                message.reply(reminders_reply)
-                message.mark_read()
-            elif (("remove!" in message.body.lower() or "!remove" in message.body.lower()) and prawobject and not message.was_comment and
-                 (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
-                givenid = re.findall(r'remove!\s(.*?)$', message.body.lower())[0]
-                deletedFlag = remove_reminder(message.author.name, givenid)
-                listOfReminders = grab_list_of_reminders(message.author.name)
-                # This means the user did own that reminder
-                if deletedFlag == True:
-                    message.reply("Reminder deleted. Your current Reminders:\n\n" + listOfReminders)
-                else:
-                    message.reply("Try again with the current IDs that belong to you below. Your current Reminders:\n\n" + listOfReminders)
-                message.mark_read()
-            elif (("removeall!" in message.body.lower() or "!removeall" in message.body.lower()) and prawobject and not message.was_comment and
+            if (prawobject and
+                message.author is not None and
+                message.author.name != "AutoModerator" and
+                not message.was_comment and
                 (ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME))):
-                count = str(remove_all(message.author.name))
-                listOfReminders = grab_list_of_reminders(message.author.name)
-                message.reply("I have deleted all **" + count + "** reminders for you.\n\n" + listOfReminders)
-                message.mark_read()
-            elif ENVIRONMENT != "DEV" or (message.author is not None and message.author.name == DEV_USER_NAME): #unknown pm
-                #mark_read first in case unexpected error
-                message.mark_read()
-                permalink = None
-                if message.was_comment:
-                    permalink = reddit.comment(message.id).parent().permalink
 
-                reddit.redditor(DEV_USER_NAME).message('cryptoRemindMe Unknown PM FWD',
-                                "From: " + (message.author.name if message.author is not None else message.subreddit_name_prefixed) + "\n\n" +
-                                "Subject: " + message.subject + "\n\n" +
-                                "Parent Permalink: " + (permalink if permalink is not None else "NONE") + "\n\n" +
-                                message.body)
+                if ("cryptoremindme" in message.body.lower() or
+                    "cryptoremindme!" in message.body.lower() or
+                    "!cryptoremindme" in message.body.lower()):
+                    redditPM = Search(message)
+                    redditPM.run(privateMessage=True)
+                    message.mark_read()
+                elif ("delete!" in message.body.lower() or "!delete" in message.body.lower()):
+                    try:
+                        givenid = re.findall(r'delete!\s(.*?)$', message.body.lower())[0]
+                        comment = reddit.comment(givenid)
+                        parentcomment = comment.parent()
+                        if message.author.name == parentcomment.author.name:
+                            comment.delete()
+                    except ValueError as err:
+                        # comment wasn't inside the list
+                        logger.error(err)
+                        logger.error("ValueError in read_pm in delete!")
+                    except AttributeError as err:
+                        # comment might be deleted already
+                        logger.error(err)
+                        logger.error("AttributeError in read_pm in delete!")
+                    except Exception as err:
+                        logger.error(err)
+                        logger.error("Unknown Exception in read_pm in delete!")
+
+                    message.mark_read()
+                elif ("myreminders!" in message.body.lower() or "!myreminders" in message.body.lower()):
+                    reminders_reply = grab_list_of_reminders(message.author.name)
+                    message.reply(reminders_reply)
+                    message.mark_read()
+                elif ("remove!" in message.body.lower() or "!remove" in message.body.lower()):
+                    givenid = re.findall(r'remove!\s(.*?)$', message.body.lower())[0]
+                    deletedFlag = remove_reminder(message.author.name, givenid)
+                    listOfReminders = grab_list_of_reminders(message.author.name)
+                    # This means the user did own that reminder
+                    if deletedFlag == True:
+                        message.reply("Reminder deleted. Your current Reminders:\n\n" + listOfReminders)
+                    else:
+                        message.reply("Try again with the current IDs that belong to you below. Your current Reminders:\n\n" + listOfReminders)
+                    message.mark_read()
+                elif ("removeall!" in message.body.lower() or "!removeall" in message.body.lower()):
+                    count = str(remove_all(message.author.name))
+                    listOfReminders = grab_list_of_reminders(message.author.name)
+                    message.reply("I have deleted all **" + count + "** reminders for you.\n\n" + listOfReminders)
+                    message.mark_read()
+                else: #unknown pm
+                    #mark_read first in case unexpected error
+                    message.mark_read()
+                    message.reply("[Sorry](https://media.giphy.com/media/sS8YbjrTzu4KI/giphy.gif), I was unable to process your comment.\n\n"
+                                  "Check out the [README](https://github.com/jjmerri/cryptoRemindMe-Reddit/blob/master/README.md) for a list of supported commands.")
+                    permalink = None
+                    if message.was_comment:
+                        permalink = reddit.comment(message.id).parent().permalink
+
+                    reddit.redditor(DEV_USER_NAME).message('cryptoRemindMe Unknown PM FWD',
+                                    "From: " + (message.author.name if message.author is not None else message.subreddit_name_prefixed) + "\n\n" +
+                                    "Subject: " + message.subject + "\n\n" +
+                                    "Parent Permalink: " + (permalink if permalink is not None else "NONE") + "\n\n" +
+                                    message.body)
+            elif ENVIRONMENT != "DEV" and not message.was_comment:
+                logger.info("Could not process PM from {author}".format(
+                    author = (message.author.name if message.author is not None else "NONE")
+                ))
+                reddit.redditor(DEV_USER_NAME).message('cryptoRemindMe Unknown Message Received',
+                                                       "Unknown PM received, check out the bot's inbox")
     except Exception as err:
         logger.error(traceback.format_exc())
         logger.error(err)

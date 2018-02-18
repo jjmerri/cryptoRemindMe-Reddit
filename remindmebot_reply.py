@@ -6,6 +6,7 @@
 
 import praw
 import MySQLdb
+from threading import Thread, Lock
 import os
 import sys
 import configparser
@@ -50,6 +51,11 @@ logger.setLevel(logging.INFO)
 supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","REQ",
                      "STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
 
+cc_max_api_per_sec = 15
+cc_total_api_calls = 0
+cc_api_clock_start = 0.0
+cc_api_lock = Lock()
+
 # =============================================================================
 # CLASSES
 # =============================================================================
@@ -89,6 +95,7 @@ class Reply(object):
             )
         self.last_price_time = {}
         self._price_history = {}
+        self.lock = Lock()
 
 
     def set_price_extremes(self):
@@ -105,6 +112,8 @@ class Reply(object):
 
         lastrun_file.close()
 
+        price_threads = [];
+
         for supported_ticker in supported_tickers:
             current_time_sec = int(time.time())
             if supported_ticker in lastrun_sec:
@@ -116,10 +125,16 @@ class Reply(object):
             #Get data from at least 10 min back
             mins_since_lastrun = mins_since_lastrun if mins_since_lastrun >= 10 else 10
 
-            r = requests.get('https://min-api.cryptocompare.com/data/histominute?fsym={ticker}&tsym=USD&e=CCCAGG&limit='.format(ticker=supported_ticker) + str(mins_since_lastrun))
-            response = r.json()
-            self._price_history[supported_ticker] = response['Data']
+            #Thread api calls because they take a while in succession
+            t = Thread(target=self._update_price_data, args=[supported_ticker, mins_since_lastrun])
+            price_threads.append(t)
+            t.start()
 
+        #Wait for all price data to be set
+        for price_thread in price_threads:
+            price_thread.join()
+
+        for supported_ticker in supported_tickers:
             for minute_data in self._price_history[supported_ticker]:
 
                 high = minute_data['high']
@@ -136,6 +151,40 @@ class Reply(object):
                 if supported_ticker not in self.last_price_time or minute_data['time'] > self.last_price_time[supported_ticker]:
                     self.last_price_time[supported_ticker] = minute_data['time']
 
+    def _update_price_data(self, ticker, limit):
+        global cc_total_api_calls, cc_api_clock_start
+
+        api_url = 'https://min-api.cryptocompare.com/data/histominute?fsym={ticker}&tsym=USD&e=CCCAGG&limit={limit}'.format(
+            ticker = ticker, limit = str(limit))
+
+        #if we exceed the allowed number of api calls wait and reset counters
+        #wait is set to 2 seconds because 1 isnt enough for some reason
+        #even though the API says 15 calls per second
+        cc_api_lock.acquire()
+        try:
+            if cc_api_clock_start == 0:
+                cc_api_clock_start = time.time()
+
+            if cc_total_api_calls >= cc_max_api_per_sec:
+                time_since_clock_started = time.time() - cc_api_clock_start
+                if time_since_clock_started < 2:
+                    time.sleep(2)
+
+                cc_total_api_calls = 0
+                cc_api_clock_start = time.time()
+
+            cc_total_api_calls += 1
+        finally:
+            cc_api_lock.release()
+
+        r = requests.get(api_url)
+        response = r.json()
+
+        self.lock.acquire()
+        try:
+            self._price_history[ticker] = response['Data']
+        finally:
+            self.lock.release()
 
     def _parent_comment(self, commentId):
         """
