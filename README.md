@@ -88,7 +88,7 @@ This Bash script will gracefully stop running instances of the Python scripts by
 
 #### lastrun files
 
-These files are updated by the Python scripts to persist timestamps of when processes are run. This allows the bots to pick up where they left of chronologically in the event of a restart. The timestamps are used to retrieve price data as well as unprocessed comments. The information in these files will eventually be moved to a table in the database.
+These files are updated by the Python scripts to persist timestamps of when processes are run. This allows the bots to pick up where they left off chronologically in the event of a restart. The timestamps are used to retrieve price data as well as unprocessed comments. The information in these files will eventually be moved to a table in the database.
 
 #### schema.sql
 
