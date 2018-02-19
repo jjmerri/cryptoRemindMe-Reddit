@@ -42,7 +42,7 @@ Example:
 Remove! 99
 
 ##### RemoveAll!
-The Remove command can only be initiated through a PM to cryptoRemindMeBot. It will cause the bot to remove all reminders for the user making the request.
+The RemoveAll command can only be initiated through a PM to cryptoRemindMeBot. It will cause the bot to remove all reminders for the user making the request.
 
 
 Example:
