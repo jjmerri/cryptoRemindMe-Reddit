@@ -34,7 +34,7 @@ Example:
 MyReminders!
 
 ##### Remove! {reminder_id}
-The Remove command can only be initiated through a PM to cryptoRemindMeBot. It will cause the bot to remove the reminder that corresponds to the given reminder_id. You can only remove reminders you requested the reminder. A link to this command will be provided in the list of current reminders provided by the MyReminders command.
+The Remove command can only be initiated through a PM to cryptoRemindMeBot. It will cause the bot to remove the reminder that corresponds to the given reminder_id. You can only remove reminders if you requested the reminder. A link to this command will be provided in the list of current reminders provided by the MyReminders command.
 
 
 Example:
