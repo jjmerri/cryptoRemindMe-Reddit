@@ -42,6 +42,7 @@ DB_USER = config.get("SQL", "user")
 DB_PASS = config.get("SQL", "passwd")
 
 ENVIRONMENT = config.get("REMINDME", "environment")
+DEV_USER_NAME = "BoyAndHisBlob"
 
 FORMAT = '%(asctime)-15s %(message)s'
 logging.basicConfig(format=FORMAT)
@@ -53,7 +54,6 @@ supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LS
 
 cc_max_api_per_sec = 15
 cc_total_api_calls = 0
-cc_api_clock_start = 0.0
 cc_api_lock = Lock()
 
 # =============================================================================
@@ -102,6 +102,10 @@ class Reply(object):
         """
         Sets the high and low since the last run
         """
+        global cc_total_api_calls
+
+        #reset number of calls for new iteration
+        cc_total_api_calls = 0
 
         lastrun_file = open("lastrun.txt", "r")
         lastrun_sec = {}
@@ -152,39 +156,47 @@ class Reply(object):
                     self.last_price_time[supported_ticker] = minute_data['time']
 
     def _update_price_data(self, ticker, limit):
-        global cc_total_api_calls, cc_api_clock_start
+        """
+        :param ticker: the ticker for the crypto that the price info is being updated for
+        :param limit: number of minutes back to get the price data
+        """
+        global cc_total_api_calls
 
         api_url = 'https://min-api.cryptocompare.com/data/histominute?fsym={ticker}&tsym=USD&e=CCCAGG&limit={limit}'.format(
             ticker = ticker, limit = str(limit))
 
-        #if we exceed the allowed number of api calls wait and reset counters
-        #wait is set to 2 seconds because 1 isnt enough for some reason
-        #even though the API says 15 calls per second
-        cc_api_lock.acquire()
-        try:
-            if cc_api_clock_start == 0:
-                cc_api_clock_start = time.time()
+        api_error_count = 0
 
-            if cc_total_api_calls >= cc_max_api_per_sec:
-                time_since_clock_started = time.time() - cc_api_clock_start
-                if time_since_clock_started < 2:
+        #Loop to retry getting API data. Will break on success or 10 consecutive errors
+        while True:
+            #if we exceed the allowed number of api calls wait and reset counters
+            #wait is set to 2 seconds because 1 isnt enough for some reason
+            #even though the API says 15 calls per second
+            with cc_api_lock:
+                if cc_total_api_calls >= cc_max_api_per_sec:
                     time.sleep(2)
+                    cc_total_api_calls = 0
 
-                cc_total_api_calls = 0
-                cc_api_clock_start = time.time()
+                cc_total_api_calls += 1
 
-            cc_total_api_calls += 1
-        finally:
-            cc_api_lock.release()
+            r = requests.get(api_url)
+            response = r.json()
 
-        r = requests.get(api_url)
-        response = r.json()
+            #If not success then retry up to 10 times after 1 sec wait
+            if response.get("Response", "Error") != "Success":
+                api_error_count += 1
+                print("Retry number {error_count} Retrieving {ticker} Info".format(ticker = ticker, error_count = api_error_count))
+                time.sleep(1)
+                if api_error_count >= 10:
+                    send_dev_pm("Error Retrieving {ticker} Info".format(ticker = ticker),
+                                "Max error count hit. Could not retrieve histo info from {url}".format(url = api_url))
+                    break #dont infinite loop. Maybe the API is down.
+            else:
+                break
 
-        self.lock.acquire()
-        try:
+        #Not sure if this lock is necessary but it makes me feel better and adds little overhead
+        with self.lock:
             self._price_history[ticker] = response['Data']
-        finally:
-            self.lock.release()
 
     def _parent_comment(self, commentId):
         """
@@ -369,6 +381,10 @@ def create_running():
     running_file = open("reply_bot.running", "w")
     running_file.write(str(os.getpid()))
     running_file.close()
+
+def send_dev_pm(subject, body):
+    reddit.redditor(DEV_USER_NAME).message(subject, body)
+
 
 # =============================================================================
 # MAIN
