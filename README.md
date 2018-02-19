@@ -19,7 +19,7 @@ Example:
 cryptoRemindMe! xrp $2.10 "Some reason for reminder"
 
 ##### Delete! {comment_id}
-The Delete command can only be initiated through a PM to cryptoRemindMeBot. It will delete the confirmation comment made by the cryptoRemindMeBot Reddit user. This will only work if the user making the request is the user the bot replied to. I link containing this command is provided in all cryptoRemindMeBot confirmation comments.
+The Delete command can only be initiated through a PM to cryptoRemindMeBot. It will delete the confirmation comment made by the cryptoRemindMeBot Reddit user. This will only work if the user making the request is the user the bot replied to. A link containing this command is provided in all cryptoRemindMeBot confirmation comments.
 
 Example:
 
