@@ -6,6 +6,7 @@
 
 import praw
 import MySQLdb
+import traceback
 from threading import Thread, Lock
 import os
 import sys
@@ -406,16 +407,21 @@ def main():
         logger.error("Reply already running! Will not start.")
 
     while start_process and os.path.isfile("reply_bot.running"):
-        logger.info("Start Main Loop")
-        checkReply = Reply()
-        checkReply.set_price_extremes()
-        checkReply.populate_reply_list()
-        checkReply.send_replies()
+        try:
+            logger.info("Start Main Loop")
+            checkReply = Reply()
+            checkReply.set_price_extremes()
+            checkReply.populate_reply_list()
+            checkReply.send_replies()
 
-        update_last_run(checkReply)
-
-        logger.info("End Main Loop")
-        time.sleep(600)
+            update_last_run(checkReply)
+            logger.info("End Main Loop")
+            time.sleep(600)
+        except Exception as err:
+            logger.error(err)
+            logger.error("Unknown Exception in main loop")
+            send_dev_pm("Unknown Exception in main loop", "Error: {exception}\n\n{trace}".format(exception = str(err), trace = traceback.format_exc()))
+            time.sleep(600)
 
     sys.exit()
 
