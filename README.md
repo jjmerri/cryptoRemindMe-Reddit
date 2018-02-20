@@ -19,7 +19,7 @@ Example:
 cryptoRemindMe! xrp $2.10 "Some reason for reminder"
 
 ##### Delete! {comment_id}
-The Delete command can only be initiated through a PM to cryptoRemindMeBot. It will delete the confirmation comment made by the cryptoRemindMeBot Reddit user. This will only work if the user making the request is the user the bot replied to. I link containing this command is provided in all cryptoRemindMeBot confirmation comments.
+The Delete command can only be initiated through a PM to cryptoRemindMeBot. It will delete the confirmation comment made by the cryptoRemindMeBot Reddit user. This will only work if the user making the request is the user the bot replied to. A link containing this command is provided in all cryptoRemindMeBot confirmation comments.
 
 Example:
 
@@ -34,7 +34,7 @@ Example:
 MyReminders!
 
 ##### Remove! {reminder_id}
-The Remove command can only be initiated through a PM to cryptoRemindMeBot. It will cause the bot to remove the reminder that corresponds to the given reminder_id. You can only remove reminders you requested the reminder. A link to this command will be provided in the list of current reminders provided by the MyReminders command.
+The Remove command can only be initiated through a PM to cryptoRemindMeBot. It will cause the bot to remove the reminder that corresponds to the given reminder_id. You can only remove reminders if you requested the reminder. A link to this command will be provided in the list of current reminders provided by the MyReminders command.
 
 
 Example:
@@ -42,7 +42,7 @@ Example:
 Remove! 99
 
 ##### RemoveAll!
-The Remove command can only be initiated through a PM to cryptoRemindMeBot. It will cause the bot to remove all reminders for the user making the request.
+The RemoveAll command can only be initiated through a PM to cryptoRemindMeBot. It will cause the bot to remove all reminders for the user making the request.
 
 
 Example:
@@ -88,7 +88,7 @@ This Bash script will gracefully stop running instances of the Python scripts by
 
 #### lastrun files
 
-These files are updated by the Python scripts to persist timestamps of when processes are run. This allows the bots to pick up where they left of chronologically in the event of a restart. The timestamps are used to retrieve price data as well as unprocessed comments. The information in these files will eventually be moved to a table in the database.
+These files are updated by the Python scripts to persist timestamps of when processes are run. This allows the bots to pick up where they left off chronologically in the event of a restart. The timestamps are used to retrieve price data as well as unprocessed comments. The information in these files will eventually be moved to a table in the database.
 
 #### schema.sql
 
