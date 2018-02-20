@@ -1,7 +1,11 @@
 #!/bin/bash
+script_dir="/root/apps/cryptoRemindMe-Reddit/"
+logs_dir=$script_dir"logs/"
+search_running_file=$script_dir"search_bot.running"
+reply_running_file=$script_dir"reply_bot.running"
 
-search_running_file="search_bot.running"
-reply_running_file="reply_bot.running"
+search_log_file="search.log"
+reply_log_file="reply.log"
 
 search_pid=`cat $search_running_file`
 reply_pid=`cat $reply_running_file`
@@ -27,12 +31,16 @@ do
     kill_reply_ret=$?
 done
 
+echo "renaming logs"
+mv $script_dir$search_log_file $logs_dir$search_log_file.$(date +%F-%T)
+mv $script_dir$reply_log_file $logs_dir$reply_log_file.$(date +%F-%T)
+
 echo "PIDs stopped. Starting scripts."
 
-python3 -u remindmebot_search.py > search.log 2>&1 &
+python3 -u $script_dir"remindmebot_search.py" > $script_dir$search_log_file 2>&1 &
 search_pid=$!
 
-python3 -u remindmebot_reply.py > reply.log 2>&1 &
+python3 -u $script_dir"remindmebot_reply.py" > $script_dir$reply_log_file 2>&1 &
 reply_pid=$!
 
 echo "disowning $search_pid $reply_pid"
