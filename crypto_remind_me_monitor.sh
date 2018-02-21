@@ -1,12 +1,14 @@
 #!/bin/bash
 script_dir="/root/apps/cryptoRemindMe-Reddit/"
-search_running_file=$script_dir"search_bot.running"
-reply_running_file=$script_dir"reply_bot.running"
+search_running_file="search_bot.running"
+reply_running_file="reply_bot.running"
 
-mail_sent_file=$script_dir"monitor_mail_sent.txt"
+mail_sent_file="monitor_mail_sent.txt"
 
-search_log_file=$script_dir"search.log"
-reply_log_file=$script_dir"reply.log"
+search_log_file="search.log"
+reply_log_file="reply.log"
+
+cd $script_dir
 
 search_pid=`cat $search_running_file`
 reply_pid=`cat $reply_running_file`
@@ -22,3 +24,5 @@ then
     echo "mail sent" > $mail_sent_file
     (echo "SEARCH LOG"; tail -40 $search_log_file; echo "REPLY LOG"; tail -40 $reply_log_file) | mail -t jjmerri88@gmail.com -s "Crypto Remind Me Bots Not Running!"
 fi
+
+exit 0
