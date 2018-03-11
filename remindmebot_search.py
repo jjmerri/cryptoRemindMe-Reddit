@@ -96,8 +96,7 @@ class Search(object):
         try:
             parsed_command = self._parse_comment()
         except Exception as err:
-            logger.error(err)
-            logger.error("Unknown Exception in run while parsing comment")
+            logger.exception("Unknown Exception in run while parsing comment")
             parsed_command = None
 
         if parsed_command == ParseMessage.SUCCESS:
@@ -106,9 +105,11 @@ class Search(object):
                 self._build_message()
                 self._reply()
             except Exception as err:
-                logger.error(err)
-                logger.error("Unknown Exception in run after parsed command")
-                send_message_generic_error(self.comment)
+                logger.exception("Unknown Exception in run after parsed command")
+                try:
+                    send_message_generic_error(self.comment)
+                except Exception as err:
+                    logger.exception("error sending generic error message")
         elif parsed_command == ParseMessage.SYNTAX_ERROR:
             send_message_syntax(self.comment)
         elif parsed_command == ParseMessage.UNSUPPORTED_TICKER:
@@ -229,18 +230,15 @@ class Search(object):
             else:
                 send_message()
         except APIException as err: # Catch any less specific API errors
-            logger.error(err)
-            logger.error("APIException in _reply")
+            logger.exception("APIException in _reply")
             if err.error_type == "RATELIMIT":
                 send_message()
 
         except PRAWException as err:
-            logger.error(err)
-            logger.error("PRAWException in _reply")
+            logger.exception("PRAWException in _reply")
             send_message()
         except Exception as err:
-            logger.error(err)
-            logger.error("Unknown Exception in _reply")
+            logger.exception("Unknown Exception in _reply")
 
     def _find_bot_child_comment(self):
         """
@@ -256,8 +254,7 @@ class Search(object):
                         self.comment_count(comment)
                         break;
         except Exception as err:
-            logger.error(err)
-            logger.error("Unknown Exception in _find_bot_child_comment")
+            logger.exception("Unknown Exception in _find_bot_child_comment")
             
     def comment_count(self, found_comment):
         """
@@ -294,12 +291,10 @@ def is_valid_comment_id(comment_id):
         reddit.comment(comment_id).submission
         is_valid = True
     except PRAWException as err:
-        logger.error(err)
-        logger.error("Not a valid ID")
+        logger.exception("Not a valid ID")
         is_valid = False
     except Exception as err:
-        logger.error(err)
-        logger.error("Unknown Exception in is_valid_comment_id")
+        logger.exception("Unknown Exception in is_valid_comment_id")
         is_valid = False
 
     return is_valid
@@ -455,15 +450,12 @@ def read_pm():
                             comment.delete()
                     except ValueError as err:
                         # comment wasn't inside the list
-                        logger.error(err)
-                        logger.error("ValueError in read_pm in delete!")
+                        logger.exception("ValueError in read_pm in delete!")
                     except AttributeError as err:
                         # comment might be deleted already
-                        logger.error(err)
-                        logger.error("AttributeError in read_pm in delete!")
+                        logger.exception("AttributeError in read_pm in delete!")
                     except Exception as err:
-                        logger.error(err)
-                        logger.error("Unknown Exception in read_pm in delete!")
+                        logger.exception("Unknown Exception in read_pm in delete!")
 
                     message.mark_read()
                 elif ("myreminders!" in message.body.lower() or "!myreminders" in message.body.lower()):
@@ -506,9 +498,7 @@ def read_pm():
                 reddit.redditor(DEV_USER_NAME).message('cryptoRemindMe Unknown Message Received',
                                                        "Unknown PM received, check out the bot's inbox")
     except Exception as err:
-        logger.error(traceback.format_exc())
-        logger.error(err)
-        logger.error("Unknown Exception in read_pm")
+        logger.exception("Unknown Exception in read_pm")
 
 def check_comment(comment):
     """
@@ -625,9 +615,7 @@ def main():
 
             logger.info("End Main Loop")
         except Exception as err:
-            logger.error(err)
-            logger.error(traceback.format_exc())
-            logger.error("Unknown Exception in Main Loop")
+            logger.exception("Unknown Exception in Main Loop")
 
         time.sleep(30)
 
