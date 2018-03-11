@@ -140,21 +140,22 @@ class Reply(object):
             price_thread.join()
 
         for supported_ticker in supported_tickers:
-            for minute_data in self._price_history[supported_ticker]:
+            if supported_ticker in self._price_history: #false if we couldnt retriev price data from the API
+                for minute_data in self._price_history[supported_ticker]:
 
-                high = minute_data['high']
-                low = minute_data['low']
+                    high = minute_data['high']
+                    low = minute_data['low']
 
-                if (supported_ticker + "_high") not in self._price_history or high > self._price_history[supported_ticker + "_high"]:
-                    self._price_history[supported_ticker + "_high"] = high
-                    self._price_history[supported_ticker + "_high_time"] = minute_data['time']
+                    if (supported_ticker + "_high") not in self._price_history or high > self._price_history[supported_ticker + "_high"]:
+                        self._price_history[supported_ticker + "_high"] = high
+                        self._price_history[supported_ticker + "_high_time"] = minute_data['time']
 
-                if (supported_ticker + "_low") not in self._price_history or low < self._price_history[supported_ticker + "_low"]:
-                    self._price_history[supported_ticker + "_low"] = low
-                    self._price_history[supported_ticker + "_low_time"] = minute_data['time']
+                    if (supported_ticker + "_low") not in self._price_history or low < self._price_history[supported_ticker + "_low"]:
+                        self._price_history[supported_ticker + "_low"] = low
+                        self._price_history[supported_ticker + "_low_time"] = minute_data['time']
 
-                if supported_ticker not in self.last_price_time or minute_data['time'] > self.last_price_time[supported_ticker]:
-                    self.last_price_time[supported_ticker] = minute_data['time']
+                    if supported_ticker not in self.last_price_time or minute_data['time'] > self.last_price_time[supported_ticker]:
+                        self.last_price_time[supported_ticker] = minute_data['time']
 
     def _update_price_data(self, ticker, limit):
         """
@@ -211,12 +212,11 @@ class Reply(object):
             else:
                 return comment.parent().permalink
         except IndexError as err:
-            logger.error("parrent_comment error")
+            logger.exception("parrent_comment error")
             return "It seems your original comment was deleted, unable to return parent comment."
         # Catch any URLs that are not reddit comments
         except Exception  as err:
-            logger.error(err)
-            logger.error("HTTPError/PRAW parent comment")
+            logger.exception("HTTPError/PRAW parent comment")
             return "Parent comment not required for this URL."
 
     def populate_reply_list(self):
@@ -284,13 +284,11 @@ class Reply(object):
                             break
 
                 except IndexError as err:
-                    logger.error(err)
-                    logger.error("IndexError in send_replies")
+                    logger.exception("IndexError in send_replies")
                     send_reply = False
                 # Catch any URLs that are not reddit comments
                 except Exception  as err:
-                    logger.error(err)
-                    logger.error("Unknown Exception send_replies")
+                    logger.exception("Unknown Exception send_replies")
                     send_reply = False
 
                 if send_reply:
@@ -337,31 +335,25 @@ class Reply(object):
             logger.info("Sent Reply")
             return True
         except APIException as err:
-            logger.error(err)
-            logger.error("APIException in _send_reply")
+            logger.exception("APIException in _send_reply")
             return False
         except IndexError as err:
-            logger.error(err)
-            logger.error("IndexError in _send_reply")
+            logger.exception("IndexError in _send_reply")
             return False
         except (HTTPError, ConnectionError, Timeout, timeout) as err:
-            logger.error(err)
-            logger.error("HTTPError in _send_reply")
+            logger.exception("HTTPError in _send_reply")
             time.sleep(10)
             return False
         except ClientException as err:
-            logger.error(err)
-            logger.error("ClientException in _send_reply")
+            logger.exception("ClientException in _send_reply")
             time.sleep(10)
             return False
         except PRAWException as err:
-            logger.error(err)
-            logger.error("PRAWException in _send_reply")
+            logger.exception("PRAWException in _send_reply")
             time.sleep(10)
             return False
         except Exception as err:
-            logger.error(err)
-            logger.error("Unknown Exception in _send_reply")
+            logger.exception("Unknown Exception in _send_reply")
             return False
 
 def update_last_run(checkReply):
@@ -418,9 +410,12 @@ def main():
             logger.info("End Main Loop")
             time.sleep(600)
         except Exception as err:
-            logger.error(err)
-            logger.error("Unknown Exception in main loop")
-            send_dev_pm("Unknown Exception in main loop", "Error: {exception}\n\n{trace}".format(exception = str(err), trace = traceback.format_exc()))
+            logger.exception("Unknown Exception in main loop")
+            try:
+                send_dev_pm("Unknown Exception in main loop", "Error: {exception}\n\n{trace}".format(exception = str(err), trace = traceback.format_exc()))
+            except Exception as err:
+                logger.exception("Unknown senidng dev pm")
+
             time.sleep(600)
 
     sys.exit()
