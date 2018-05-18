@@ -25,4 +25,9 @@ then
     (echo "SEARCH LOG"; tail -40 $search_log_file; echo "REPLY LOG"; tail -40 $reply_log_file) | mail -t jjmerri88@gmail.com -s "Crypto Remind Me Bots Not Running!"
 fi
 
+if [ "$kill_reply_ret" -eq "0" ] && [ "$kill_search_ret" -eq "0" ] && [ -f $mail_sent_file ]
+then
+    rm $mail_sent_file
+fi
+
 exit 0
