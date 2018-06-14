@@ -22,7 +22,7 @@ kill_reply_ret=$?
 if [ "$kill_reply_ret" -ne "0" -o "$kill_search_ret" -ne "0" ] && [ ! -f $mail_sent_file ]
 then
     echo "mail sent" > $mail_sent_file
-    (echo "SEARCH LOG"; tail -40 $search_log_file; echo "REPLY LOG"; tail -40 $reply_log_file) | mail -t jjmerri88@gmail.com -s "Crypto Remind Me Bots Not Running!"
+    (echo "SEARCH LOG"; tail -40 $search_log_file; echo "REPLY LOG"; tail -40 $reply_log_file) | mail -t BlobForge@gmail.com -s "Crypto Remind Me Bots Not Running!"
 fi
 
 if [ "$kill_reply_ret" -eq "0" ] && [ "$kill_search_ret" -eq "0" ] && [ -f $mail_sent_file ]
