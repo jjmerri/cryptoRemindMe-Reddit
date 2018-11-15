@@ -53,6 +53,7 @@ logger.setLevel(logging.INFO)
 supported_tickers = ["ADA","BCH","BCN","BTC","BTG","DASH","DOGE","ETC","ETH","LSK","LTC","NEO","QASH","QTUM","REQ",
                      "STEEM","XEM","XLM","XMR","XRB","XRP","ZEC"]
 
+MAX_API_TIME_LIMIT = 2000
 cc_max_api_per_sec = 15
 cc_total_api_calls = 0
 cc_api_lock = Lock()
@@ -125,7 +126,10 @@ class Reply(object):
                 mins_since_lastrun = (current_time_sec - lastrun_sec[supported_ticker]) // 60
             else:
                 #max allowed by API
-                mins_since_lastrun = 2000
+                mins_since_lastrun = MAX_API_TIME_LIMIT
+
+            if mins_since_lastrun > MAX_API_TIME_LIMIT:
+                mins_since_lastrun = MAX_API_TIME_LIMIT
 
             #Get data from at least 10 min back
             mins_since_lastrun = mins_since_lastrun if mins_since_lastrun >= 10 else 10
