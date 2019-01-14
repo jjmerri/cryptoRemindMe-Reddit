@@ -150,16 +150,18 @@ class Reply(object):
                     high = minute_data['high']
                     low = minute_data['low']
 
-                    if (supported_ticker + "_high") not in self._price_history or high > self._price_history[supported_ticker + "_high"]:
-                        self._price_history[supported_ticker + "_high"] = high
-                        self._price_history[supported_ticker + "_high_time"] = minute_data['time']
+                    #sometimes the API incorrectly returns 0 so this is an attempt to avoid incorrectly notifying on 0 price
+                    if high > 0 and low > 0:
+                        if (supported_ticker + "_high") not in self._price_history or high > self._price_history[supported_ticker + "_high"]:
+                            self._price_history[supported_ticker + "_high"] = high
+                            self._price_history[supported_ticker + "_high_time"] = minute_data['time']
 
-                    if (supported_ticker + "_low") not in self._price_history or low < self._price_history[supported_ticker + "_low"]:
-                        self._price_history[supported_ticker + "_low"] = low
-                        self._price_history[supported_ticker + "_low_time"] = minute_data['time']
+                        if (supported_ticker + "_low") not in self._price_history or low < self._price_history[supported_ticker + "_low"]:
+                            self._price_history[supported_ticker + "_low"] = low
+                            self._price_history[supported_ticker + "_low_time"] = minute_data['time']
 
-                    if supported_ticker not in self.last_price_time or minute_data['time'] > self.last_price_time[supported_ticker]:
-                        self.last_price_time[supported_ticker] = minute_data['time']
+                        if supported_ticker not in self.last_price_time or minute_data['time'] > self.last_price_time[supported_ticker]:
+                            self.last_price_time[supported_ticker] = minute_data['time']
 
     def _update_price_data(self, ticker, limit):
         """
