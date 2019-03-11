@@ -88,12 +88,11 @@ class Reply(object):
             "\n\nYou requested a reminder when the price of {ticker} reached {new_price} from {origin_price}."
             "\n\nThe price hit {price} at {price_time} using CryptoCompare's Current Aggregate."
             "\n\n_____\n\n"
-            "|[^(README)](https://github.com/jjmerri/cryptoRemindMe-Reddit/blob/master/README.md)"
-            "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
-            "|[^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=cryptoRemindMe Feedback)"
-            "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
-            "\n|-|-|-|-|-|-|\n\n" +
-            "^^^^.\n\n^^^^**DISCLAIMER:** ^^^^The ^^^^developer ^^^^that ^^^^maintains ^^^^this ^^^^bot ^^^^does ^^^^not ^^^^guarantee ^^^^the ^^^^accuracy ^^^^of ^^^^the ^^^^data ^^^^it ^^^^provides ^^^^nor ^^^^does ^^^^he ^^^^gurantee ^^^^the ^^^^reliability ^^^^of ^^^^its ^^^^notification ^^^^system. ^^^^Do ^^^^not ^^^^rely ^^^^on ^^^^this ^^^^bot ^^^^for ^^^^information ^^^^that ^^^^will ^^^^affect ^^^^your ^^^^financial ^^^^decisions. ^^^^Double ^^^^check ^^^^all ^^^^prices ^^^^before ^^^^acting ^^^^on ^^^^any ^^^^information ^^^^provided ^^^^by ^^^^this ^^^^bot. ^^^^Do ^^^^not ^^^^rely ^^^^solely ^^^^on ^^^^this ^^^^bot ^^^^to ^^^^notify ^^^^you ^^^^of ^^^^price ^^^^updates ^^^^as ^^^^it ^^^^doesn't ^^^^have ^^^^failsafes ^^^^in ^^^^place ^^^^to ^^^^be ^^^^100% ^^^^reliable."
+            "^| [^(README)](https://github.com/jjmerri/cryptoRemindMe-Reddit/blob/master/README.md)"
+            " ^| [^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
+            " ^| [^(Feedback)](http://np.reddit.com/message/compose/?to=BoyAndHisBlob&subject=cryptoRemindMe Feedback)"
+            " ^| [^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
+            " ^| [^(Tip BoyAndHisBlob)](https://blobware-tips.firebaseapp.com)"
             )
         self.last_price_time = {}
         self._price_history = {}

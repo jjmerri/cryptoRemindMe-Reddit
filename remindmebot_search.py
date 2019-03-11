@@ -306,11 +306,11 @@ def get_disclaimer():
 def get_message_footer():
     return (
         "\n\n_____\n\n"
-        "|[^(README)](https://github.com/jjmerri/cryptoRemindMe-Reddit/blob/master/README.md)"
-        "|[^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
-        "|[^(Feedback)](http://np.reddit.com/message/compose/?to=" + DEV_USER_NAME + "&subject=cryptoRemindMe Feedback)"
-        "|[^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
-        "\n|-|-|-|-|-|-|\n\n" + get_disclaimer()
+        "^| [^(README)](https://github.com/jjmerri/cryptoRemindMe-Reddit/blob/master/README.md)"
+        " ^| [^(Your Reminders)](http://np.reddit.com/message/compose/?to=cryptoRemindMeBot&subject=List Of Reminders&message=MyReminders!)"
+        " ^| [^(Feedback)](http://np.reddit.com/message/compose/?to=" + DEV_USER_NAME + "&subject=cryptoRemindMe Feedback)"
+        " ^| [^(Code)](https://github.com/jjmerri/cryptoRemindMe-Reddit)"
+        " ^| [^(Tip BoyAndHisBlob)](https://blobware-tips.firebaseapp.com)"
     )
 def send_message_syntax(comment):
     """
